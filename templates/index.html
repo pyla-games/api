@@ -479,18 +479,6 @@
         });
     }
 
-    function performSearch() {
-        const searchInput = document.getElementById('searchInput');
-        const query = searchInput.value.trim();
-
-        if (query) {
-            currentSearch = query;
-            currentGenre = '1';
-            currentPage = 1;
-            loadGames(1);
-        }
-    }
-
     function initFromURL() {
         const params = new URLSearchParams(window.location.search);
         const genre = params.get('genre');
@@ -593,15 +581,7 @@
     <script>
         setTimeout(() => {
             attachClickListeners();
-            document.getElementById('searchInput').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') {
-                    performSearch();
-                }
-            });
-            if (window.location.pathname === '/') {
-                showGenres();
-                return;
-            }
+            initFromURL();
         }, 10);
     </script>
 </body>

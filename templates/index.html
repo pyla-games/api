@@ -24,7 +24,6 @@
     <meta name="twitter:title" content="Vyla Games - Free Game Downloads">
     <meta name="twitter:description" content="Discover and download your favorite games for free.">
 
-
     <meta property="og:image" content="/images/background.png">
     <meta name="twitter:image" content="/images/background.png">
     <meta name="twitter:image:alt" content="Vyla Games - Free Game Downloads">
@@ -87,7 +86,7 @@
                     result["next"] = `/?genre=${currentGenre}&page=${currentPage + 1}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`;
                 }
 
-                result["back"] = "/?";
+                result["back"] = "/";
 
                 if (currentSearch) {
                     result["search"] = currentSearch;
@@ -154,43 +153,104 @@
         return genres[id] || 'Unknown';
     }
 
-    function showGenres() {
-        const genres = [
-            { "id": "1", "name": "All Games", "url": `/?genre=1&page=1` },
-            { "id": "2", "name": "Action Games", "url": `/?genre=2&page=1` },
-            { "id": "3", "name": "Adventure Games", "url": `/?genre=3&page=1` },
-            { "id": "4", "name": "R18+", "url": `/?genre=4&page=1` },
-            { "id": "5", "name": "Shooting Games", "url": `/?genre=5&page=1` },
-            { "id": "6", "name": "Casual Games", "url": `/?genre=6&page=1` },
-            { "id": "7", "name": "Sports Racing", "url": `/?genre=7&page=1` },
-            { "id": "8", "name": "Simulation Business", "url": `/?genre=8&page=1` },
-            { "id": "9", "name": "Role Playing", "url": `/?genre=9&page=1` },
-            { "id": "10", "name": "Strategy Games", "url": `/?genre=10&page=1` },
-            { "id": "11", "name": "Fighting Games", "url": `/?genre=11&page=1` },
-            { "id": "12", "name": "Horror Games", "url": `/?genre=12&page=1` },
-            { "id": "13", "name": "Real-time strategy", "url": `/?genre=13&page=1` },
-            { "id": "14", "name": "Card Game", "url": `/?genre=14&page=1` },
-            { "id": "15", "name": "Indie Games", "url": `/?genre=15&page=1` },
-            { "id": "16", "name": "LAN connection", "url": `/?genre=16&page=1` }
-        ];
+    async function showGenres() {
+        try {
+            // Check system health
+            const healthResponse = await fetch('/api/health');
+            let systemStatus = 'unknown';
 
-        const result = {
-            "welcome": "vyla-games.vercel.app",
-            "description": "Select a genre to browse games",
-            "available_genres": genres.map(genre => ({
-                "name": genre.name,
-                "url": genre.url
-            }))
-        };
+            if (healthResponse.ok) {
+                const healthData = await healthResponse.json();
+                systemStatus = healthData.status || 'unknown';
+            } else {
+                systemStatus = 'fail';
+            }
 
-        document.getElementById('output').innerHTML = formatOutput(result);
-        document.getElementById('navigation').innerHTML = '';
+            const genres = [
+                { "id": "1", "name": "All Games", "url": `/?genre=1&page=1` },
+                { "id": "2", "name": "Action Games", "url": `/?genre=2&page=1` },
+                { "id": "3", "name": "Adventure Games", "url": `/?genre=3&page=1` },
+                { "id": "4", "name": "R18+", "url": `/?genre=4&page=1` },
+                { "id": "5", "name": "Shooting Games", "url": `/?genre=5&page=1` },
+                { "id": "6", "name": "Casual Games", "url": `/?genre=6&page=1` },
+                { "id": "7", "name": "Sports Racing", "url": `/?genre=7&page=1` },
+                { "id": "8", "name": "Simulation Business", "url": `/?genre=8&page=1` },
+                { "id": "9", "name": "Role Playing", "url": `/?genre=9&page=1` },
+                { "id": "10", "name": "Strategy Games", "url": `/?genre=10&page=1` },
+                { "id": "11", "name": "Fighting Games", "url": `/?genre=11&page=1` },
+                { "id": "12", "name": "Horror Games", "url": `/?genre=12&page=1` },
+                { "id": "13", "name": "Real-time strategy", "url": `/?genre=13&page=1` },
+                { "id": "14", "name": "Card Game", "url": `/?genre=14&page=1` },
+                { "id": "15", "name": "Indie Games", "url": `/?genre=15&page=1` },
+                { "id": "16", "name": "LAN connection", "url": `/?genre=16&page=1` }
+            ];
 
-        window.history.pushState({}, '', '/');
+            const result = {
+                "status": systemStatus,
+                "welcome": "vyla-games.vercel.app",
+                "description": "Select a genre to browse games",
+                "search_feature": {
+                    "how_to_search": "Visit: /search/your+search+term",
+                    "example": "/search/GTA",
+                },
+                "available_genres": genres.map(genre => ({
+                    "name": genre.name,
+                    "url": genre.url
+                }))
+            };
 
-        setTimeout(() => {
-            attachClickListeners();
-        }, 10);
+            document.getElementById('output').innerHTML = formatOutput(result);
+            document.getElementById('navigation').innerHTML = '';
+
+            window.history.pushState({}, '', '/');
+
+            setTimeout(() => {
+                attachClickListeners();
+            }, 10);
+        } catch (error) {
+            // Fallback if health check fails
+            const genres = [
+                { "id": "1", "name": "All Games", "url": `/?genre=1&page=1` },
+                { "id": "2", "name": "Action Games", "url": `/?genre=2&page=1` },
+                { "id": "3", "name": "Adventure Games", "url": `/?genre=3&page=1` },
+                { "id": "4", "name": "R18+", "url": `/?genre=4&page=1` },
+                { "id": "5", "name": "Shooting Games", "url": `/?genre=5&page=1` },
+                { "id": "6", "name": "Casual Games", "url": `/?genre=6&page=1` },
+                { "id": "7", "name": "Sports Racing", "url": `/?genre=7&page=1` },
+                { "id": "8", "name": "Simulation Business", "url": `/?genre=8&page=1` },
+                { "id": "9", "name": "Role Playing", "url": `/?genre=9&page=1` },
+                { "id": "10", "name": "Strategy Games", "url": `/?genre=10&page=1` },
+                { "id": "11", "name": "Fighting Games", "url": `/?genre=11&page=1` },
+                { "id": "12", "name": "Horror Games", "url": `/?genre=12&page=1` },
+                { "id": "13", "name": "Real-time strategy", "url": `/?genre=13&page=1` },
+                { "id": "14", "name": "Card Game", "url": `/?genre=14&page=1` },
+                { "id": "15", "name": "Indie Games", "url": `/?genre=15&page=1` },
+                { "id": "16", "name": "LAN connection", "url": `/?genre=16&page=1` }
+            ];
+
+            const result = {
+                "status": "fail",
+                "welcome": "vyla-games.vercel.app",
+                "description": "Select a genre to browse games",
+                "search_feature": {
+                    "how_to_search": "Visit: /search/your+search+term",
+                    "example": "/search/GTA",
+                },
+                "available_genres": genres.map(genre => ({
+                    "name": genre.name,
+                    "url": genre.url
+                }))
+            };
+
+            document.getElementById('output').innerHTML = formatOutput(result);
+            document.getElementById('navigation').innerHTML = '';
+
+            window.history.pushState({}, '', '/');
+
+            setTimeout(() => {
+                attachClickListeners();
+            }, 10);
+        }
     }
 
     function viewGame(gameId) {
@@ -316,9 +376,9 @@
                 line = line.replace(urlMatch[0], '"<a href="' + url + '">' + url + '</a>"');
             }
 
-            const exactBackMatch = line.match(/"back":\s*"\/\?"/);
-            if (exactBackMatch) {
-                line = line.replace(/("back":\s*")\/\?"/, '$1<a href="/?">/?</a>"');
+            const backMatch = line.match(/"back":\s*"\/"/);
+            if (backMatch) {
+                line = line.replace(/("back":\s*")\/"/, '$1<a href="/">/</a>"');
             }
 
             const apiGameMatch = line.match(/"(\/api\/game\/\d+)"/);
@@ -345,6 +405,18 @@
                 line = line.replace(gameDownloadMatch[0], '"<a href="' + url + '">' + url + '</a>"');
             }
 
+            const searchMatch = line.match(/"(\/search\?q=[^"]+)"/);
+            if (searchMatch) {
+                const url = searchMatch[1];
+                line = line.replace(searchMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
+            const searchPathMatch = line.match(/"(\/search\/[^"]+)"/);
+            if (searchPathMatch) {
+                const url = searchPathMatch[1];
+                line = line.replace(searchPathMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
             const httpMatch = line.match(/"https?:\/\/[^"]+"/g);
             if (httpMatch) {
                 httpMatch.forEach(url => {
@@ -367,7 +439,11 @@
 
                 e.preventDefault();
 
-                if (href.startsWith('/?genre=') || href === '/?') {
+                if (href.startsWith('/?genre=') || href === '/?' || href === '/') {
+                    if (href === '/') {
+                        showGenres();
+                        return;
+                    }
                     const urlParams = new URLSearchParams(href.split('?')[1]);
                     currentGenre = urlParams.get('genre') || '1';
                     currentPage = parseInt(urlParams.get('page') || '1');
@@ -390,11 +466,29 @@
                     const gameId = href.split('/')[2];
                     const title = "Game";
                     getDownload(gameId, title);
+                } else if (href.startsWith('/search/')) {
+                    const searchPath = href.substring(8);
+                    currentSearch = decodeURIComponent(searchPath);
+                    currentGenre = '1';
+                    currentPage = 1;
+                    loadGames(1);
                 } else if (href.startsWith('http')) {
                     window.open(href, '_blank');
                 }
             });
         });
+    }
+
+    function performSearch() {
+        const searchInput = document.getElementById('searchInput');
+        const query = searchInput.value.trim();
+
+        if (query) {
+            currentSearch = query;
+            currentGenre = '1';
+            currentPage = 1;
+            loadGames(1);
+        }
     }
 
     function initFromURL() {
@@ -428,8 +522,6 @@
 
 <body>
     <pre id="output">{
-  "welcome": "vyla-games.vercel.app",
-  "description": "Free game discovery service",
   "available_genres": [
     {
       "name": "All Games",
@@ -501,6 +593,15 @@
     <script>
         setTimeout(() => {
             attachClickListeners();
+            document.getElementById('searchInput').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    performSearch();
+                }
+            });
+            if (window.location.pathname === '/') {
+                showGenres();
+                return;
+            }
         }, 10);
     </script>
 </body>

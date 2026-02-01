@@ -414,9 +414,72 @@ def rate_limit_check(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/api/health')
+def health_check():
+    try:
+        test_games, _ = scraper.get_games('1', None, 1)
+        scraping_works = len(test_games) > 0
+        
+        test_url = f"{scraper.base_url}/"
+        connectivity_works = bool(scraper.fetch_page(test_url))
+        
+        checks = {
+            "scraping": scraping_works,
+            "connectivity": connectivity_works,
+            "api_responsive": True
+        }
+        
+        overall_status = "success" if all(checks.values()) else "partial" if any(checks.values()) else "fail"
+        
+        return json.dumps({
+            "status": overall_status,
+            "checks": checks,
+            "timestamp": int(time.time())
+        }, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
+        
+    except Exception as e:
+        return json.dumps({
+            "status": "fail",
+            "error": str(e),
+            "checks": {
+                "scraping": False,
+                "connectivity": False,
+                "api_responsive": False
+            },
+            "timestamp": int(time.time())
+        }, ensure_ascii=False), 500, {'Content-Type': 'application/json'}
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/search/<path:query>')
+@rate_limit_check
+def search_path(query):
+    page = int(request.args.get('page', 1))
+    
+    decoded_query = urllib.parse.unquote(query)
+    
+    games, has_next = scraper.get_games(None, decoded_query, page)
+    
+    result = {
+        'status': 'success',
+        'search_query': decoded_query,
+        'total_games': len(games),
+        'page': page,
+        'has_next': has_next,
+        'games': games
+    }
+    
+    if page > 1:
+        result['previous'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page-1}'
+    
+    if has_next:
+        result['next'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page+1}'
+    
+    result['back'] = '/'
+    
+    return json.dumps(result, ensure_ascii=False), 200, {'Content-Type': 'application/json'}
 
 @app.route('/api/games')
 @rate_limit_check

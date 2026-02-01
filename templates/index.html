@@ -2,31 +2,12 @@
 <html lang="en">
 
 <head>
+    <meta name="color-scheme" content="light dark">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vyla Games - Free Game Downloads</title>
 
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-
-    <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#050505">
-
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Vyla">
-
-    <meta name="msapplication-TileColor" content="#050505">
-    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png">
-
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <link rel="stylesheet" href="/styling/keyframes.css" />
-    <link rel="stylesheet" href="/styling/index.css">
 
     <meta name="description"
         content="Download free games with Vyla Games. No limits, no restrictions. Browse thousands of games across all genres.">
@@ -43,805 +24,484 @@
     <meta name="twitter:title" content="Vyla Games - Free Game Downloads">
     <meta name="twitter:description" content="Discover and download your favorite games for free.">
 
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "Vyla Games",
-        "url": "https://vyla-games.vercel.app/",
-        "description": "Discover and download your favorite games for free. No limits, no restrictions.",
-        "publisher": {
-            "@type": "Organization",
-            "name": "Vyla Games",
-            "logo": {
-                "@type": "ImageObject",
-                "url": "https://vyla-games.vercel.app/icons/icon-192x192.png"
+
+    <meta property="og:image" content="/images/background.png">
+    <meta name="twitter:image" content="/images/background.png">
+    <meta name="twitter:image:alt" content="Vyla Games - Free Game Downloads">
+
+</head>
+<script>
+    let currentPage = 1;
+    let currentGenre = '1';
+    let currentSearch = '';
+    let hasNextPage = false;
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function loadGames(page = 1) {
+        const output = document.getElementById('output');
+        output.innerHTML = '[\n  "Loading games..."\n]';
+
+        const params = new URLSearchParams({
+            genre: currentGenre,
+            page: page
+        });
+
+        if (currentSearch) {
+            params.append('search', currentSearch);
+        }
+
+        fetch(`/api/games?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                hasNextPage = data.has_next;
+                currentPage = data.page;
+
+                const gamesList = [];
+                data.games.forEach(game => {
+                    gamesList.push({
+                        "title": game.title,
+                        "id": game.id,
+                        "image": game.image_url,
+                        "view": `/api/game/${game.id}`
+                    });
+                });
+
+                const result = {
+                    "genre": getGenreName(currentGenre),
+                    "page": currentPage,
+                    "total_games": gamesList.length,
+                    "has_next": hasNextPage,
+                    "games": gamesList
+                };
+
+                if (currentPage > 1) {
+                    result["previous"] = `/?genre=${currentGenre}&page=${currentPage - 1}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`;
+                }
+
+                if (hasNextPage) {
+                    result["next"] = `/?genre=${currentGenre}&page=${currentPage + 1}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`;
+                }
+
+                result["back"] = "/?";
+
+                if (currentSearch) {
+                    result["search"] = currentSearch;
+                }
+                output.innerHTML = formatOutput(result);
+
+                let urlPath = `/?genre=${currentGenre}&page=${page}`;
+                if (currentSearch) {
+                    urlPath = `/?search=${encodeURIComponent(currentSearch)}&page=${page}`;
+                }
+                window.history.pushState({}, '', urlPath);
+
+                setTimeout(() => {
+                    attachClickListeners();
+                }, 10);
+            })
+            .catch(error => {
+                output.innerHTML = '{\n  "error": "Failed to load games",\n  "message": "' + escapeHtml(error.message) + '"\n}';
+            });
+    }
+
+    function updateNavigationButtons() {
+        const navDiv = document.getElementById('navigation');
+        if (!navDiv) return;
+
+        let html = '';
+
+        if (currentPage > 1) {
+            html += `<button onclick="loadGames(${currentPage - 1})">← Previous Page</button> `;
+        }
+
+        if (hasNextPage) {
+            html += `<button onclick="loadGames(${currentPage + 1})">Next Page →</button> `;
+        }
+
+        html += `<button onclick="showGenres()">← Back to Genres</button>`;
+
+        navDiv.innerHTML = html;
+    }
+
+    window.addEventListener('popstate', function (event) {
+        initFromURL();
+    });
+
+    function getGenreName(id) {
+        const genres = {
+            '1': 'All Games',
+            '2': 'Action Games',
+            '3': 'Adventure Games',
+            '4': 'R18+',
+            '5': 'Shooting Games',
+            '6': 'Casual Games',
+            '7': 'Sports Racing',
+            '8': 'Simulation Business',
+            '9': 'Role Playing',
+            '10': 'Strategy Games',
+            '11': 'Fighting Games',
+            '12': 'Horror Games',
+            '13': 'Real-time strategy',
+            '14': 'Card Game',
+            '15': 'Indie Games',
+            '16': 'LAN connection'
+        };
+        return genres[id] || 'Unknown';
+    }
+
+    function showGenres() {
+        const genres = [
+            { "id": "1", "name": "All Games", "url": `/?genre=1&page=1` },
+            { "id": "2", "name": "Action Games", "url": `/?genre=2&page=1` },
+            { "id": "3", "name": "Adventure Games", "url": `/?genre=3&page=1` },
+            { "id": "4", "name": "R18+", "url": `/?genre=4&page=1` },
+            { "id": "5", "name": "Shooting Games", "url": `/?genre=5&page=1` },
+            { "id": "6", "name": "Casual Games", "url": `/?genre=6&page=1` },
+            { "id": "7", "name": "Sports Racing", "url": `/?genre=7&page=1` },
+            { "id": "8", "name": "Simulation Business", "url": `/?genre=8&page=1` },
+            { "id": "9", "name": "Role Playing", "url": `/?genre=9&page=1` },
+            { "id": "10", "name": "Strategy Games", "url": `/?genre=10&page=1` },
+            { "id": "11", "name": "Fighting Games", "url": `/?genre=11&page=1` },
+            { "id": "12", "name": "Horror Games", "url": `/?genre=12&page=1` },
+            { "id": "13", "name": "Real-time strategy", "url": `/?genre=13&page=1` },
+            { "id": "14", "name": "Card Game", "url": `/?genre=14&page=1` },
+            { "id": "15", "name": "Indie Games", "url": `/?genre=15&page=1` },
+            { "id": "16", "name": "LAN connection", "url": `/?genre=16&page=1` }
+        ];
+
+        const result = {
+            "welcome": "vyla-games.vercel.app",
+            "description": "Select a genre to browse games",
+            "available_genres": genres.map(genre => ({
+                "name": genre.name,
+                "url": genre.url
+            }))
+        };
+
+        document.getElementById('output').innerHTML = formatOutput(result);
+        document.getElementById('navigation').innerHTML = '';
+
+        window.history.pushState({}, '', '/');
+
+        setTimeout(() => {
+            attachClickListeners();
+        }, 10);
+    }
+
+    function viewGame(gameId) {
+        fetch(`/api/game/${gameId}`)
+            .then(response => response.json())
+            .then(data => {
+                const images = data.content_images ? data.content_images : [];
+                const videos = data.videos ? data.videos : [];
+
+                const result = {
+                    "title": data.title,
+                    "file_size": data.file_size || "unknown",
+                    "version": data.version || "unknown",
+                    "game_id": data.game_id,
+                    "description": data.full_description ? data.full_description.split('|||')[0].substring(0, 200) + "..." : "No description available",
+                    "images": images,
+                    "videos": videos,
+                    "download": `/game/${data.game_id}/download`,
+                    "back": `/?genre=${currentGenre}&page=${currentPage}${currentSearch ? '&search=' + encodeURIComponent(currentSearch) : ''}`
+                };
+
+                if (data.recommendations && data.recommendations.length > 0) {
+                    result["recommendations"] = data.recommendations.map(rec => ({
+                        "title": rec.title,
+                        "id": rec.id,
+                        "image": rec.image,
+                        "view": `/api/game/${rec.id}`
+                    }));
+                }
+
+                document.getElementById('output').innerHTML = formatOutput(result);
+
+                window.history.pushState({}, '', `/?game=${gameId}`);
+
+                setTimeout(() => {
+                    attachClickListeners();
+                }, 10);
+            })
+            .catch(error => {
+                document.getElementById('output').innerHTML = `{
+  "error": "Failed to load game details"
+}`;
+
+                setTimeout(() => {
+                    attachClickListeners();
+                }, 10);
+            });
+    }
+
+    function getDownload(gameId, gameTitle) {
+        const output = document.getElementById('output');
+
+        output.innerHTML = '{\n  "status": "Fetching download URL..."\n}';
+
+        fetch(`/api/download/${gameId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.url) {
+                    const result = {
+                        "status": "Download ready",
+                        "game": gameTitle,
+                        "download_url": data.url,
+                        "instructions": "Open the URL above to download",
+                        "back": `/?game=${gameId}`
+                    };
+
+                    output.innerHTML = formatOutput(result);
+
+                    window.history.pushState({}, '', `/game/${gameId}/download`);
+                } else if (data.error === 'cooldown') {
+                    const result = {
+                        "error": "Cooldown active",
+                        "wait_seconds": data.wait || 10,
+                        "message": "Please wait before requesting another download",
+                        "back": `/?game=${gameId}`
+                    };
+                    output.innerHTML = formatOutput(result);
+                } else if (data.error === 'rate_limited') {
+                    const result = {
+                        "error": "Rate limited",
+                        "message": "Server rate limit reached. Try again in 60 seconds.",
+                        "back": `/?game=${gameId}`
+                    };
+                    output.innerHTML = formatOutput(result);
+                } else {
+                    const result = {
+                        "error": "Download failed",
+                        "message": "Could not retrieve download URL",
+                        "back": `/?game=${gameId}`
+                    };
+                    output.innerHTML = formatOutput(result);
+                }
+
+                setTimeout(() => {
+                    attachClickListeners();
+                }, 10);
+            })
+            .catch(error => {
+                const result = {
+                    "error": "Request failed",
+                    "message": escapeHtml(error.message),
+                    "back": `/?game=${gameId}`
+                };
+                output.innerHTML = formatOutput(result);
+
+                setTimeout(() => {
+                    attachClickListeners();
+                }, 10);
+            });
+    }
+
+    function formatOutput(data) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const lines = jsonStr.split('\n');
+        let result = '';
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            const urlMatch = line.match(/"(\/\?[^"]+)"/);
+            if (urlMatch) {
+                const url = urlMatch[1];
+                line = line.replace(urlMatch[0], '"<a href="' + url + '">' + url + '</a>"');
             }
+
+            const exactBackMatch = line.match(/"back":\s*"\/\?"/);
+            if (exactBackMatch) {
+                line = line.replace(/("back":\s*")\/\?"/, '$1<a href="/?">/?</a>"');
+            }
+
+            const apiGameMatch = line.match(/"(\/api\/game\/\d+)"/);
+            if (apiGameMatch) {
+                const url = apiGameMatch[1];
+                line = line.replace(apiGameMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
+            const apiGamesMatch = line.match(/"(\/api\/games\?[^"]+)"/);
+            if (apiGamesMatch) {
+                const url = apiGamesMatch[1];
+                line = line.replace(apiGamesMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
+            const apiDownloadMatch = line.match(/"(\/api\/download\/\d+)"/);
+            if (apiDownloadMatch) {
+                const url = apiDownloadMatch[1];
+                line = line.replace(apiDownloadMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
+            const gameDownloadMatch = line.match(/"(\/game\/\d+\/download)"/);
+            if (gameDownloadMatch) {
+                const url = gameDownloadMatch[1];
+                line = line.replace(gameDownloadMatch[0], '"<a href="' + url + '">' + url + '</a>"');
+            }
+
+            const httpMatch = line.match(/"https?:\/\/[^"]+"/g);
+            if (httpMatch) {
+                httpMatch.forEach(url => {
+                    const cleanUrl = url.replace(/"/g, '');
+                    line = line.replace(url, '"<a href="' + cleanUrl + '" target="_blank">' + cleanUrl + '</a>"');
+                });
+            }
+
+            result += line + '\n';
+        }
+
+        return result;
+    }
+
+    function attachClickListeners() {
+        const links = document.querySelectorAll('a');
+        links.forEach(link => {
+            link.addEventListener('click', function (e) {
+                const href = this.getAttribute('href');
+
+                e.preventDefault();
+
+                if (href.startsWith('/?genre=') || href === '/?') {
+                    const urlParams = new URLSearchParams(href.split('?')[1]);
+                    currentGenre = urlParams.get('genre') || '1';
+                    currentPage = parseInt(urlParams.get('page') || '1');
+                    currentSearch = urlParams.get('search') || '';
+                    loadGames(currentPage);
+                } else if (href.startsWith('/?game=')) {
+                    const urlParams = new URLSearchParams(href.split('?')[1]);
+                    const gameId = urlParams.get('game');
+                    viewGame(gameId);
+                } else if (href.startsWith('/api/game/')) {
+                    const gameId = href.split('/')[3];
+                    viewGame(gameId);
+                } else if (href.startsWith('/api/games?')) {
+                    const urlParams = new URLSearchParams(href.split('?')[1]);
+                    currentGenre = urlParams.get('genre') || '1';
+                    currentPage = parseInt(urlParams.get('page') || '1');
+                    currentSearch = urlParams.get('search') || '';
+                    loadGames(currentPage);
+                } else if (href.startsWith('/game/') && href.endsWith('/download')) {
+                    const gameId = href.split('/')[2];
+                    const title = "Game";
+                    getDownload(gameId, title);
+                } else if (href.startsWith('http')) {
+                    window.open(href, '_blank');
+                }
+            });
+        });
+    }
+
+    function initFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        const genre = params.get('genre');
+        const search = params.get('search');
+        const page = params.get('page');
+        const gameId = params.get('game');
+        const downloadMatch = window.location.pathname.match(/^\/game\/(\d+)\/download$/);
+        const downloadId = downloadMatch ? downloadMatch[1] : params.get('download');
+
+        if (gameId) {
+            viewGame(gameId);
+        } else if (downloadId) {
+            getDownload(downloadId, "Game");
+        } else if (genre || search || page) {
+            if (genre) currentGenre = genre;
+            if (search) currentSearch = search;
+            if (page) currentPage = parseInt(page);
+            loadGames(currentPage);
+        } else {
+            showGenres();
         }
     }
-    </script>
+
+    window.onload = function () {
+        initFromURL();
+    };
+</script>
 </head>
 
 <body>
-    <div id="minimal-hero-container">
-        <div class="hero-fade-top"></div>
-        <div id="hero-particles"></div>
-        <div class="hero-fade-bottom"></div>
-
-        <div class="minimal-hero-content" id="minimalHeroContent">
-            <h1 id="greeting-text">Find your next game</h1>
-            <div class="hero-search-wrapper">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="heroSearchInput" placeholder="Search for games...">
-            </div>
-        </div>
-    </div>
-
-    <div class="navbar-wrapper">
-        <nav class="navbar" id="mainNavbar">
-            <div class="nav-group nav-left">
-                <a class="navbar-brand-button" id="navbarBrandAndBack" aria-label="Home" href="/">
-                    <span class="navbar-logo">
-                        <img src="/favicon.ico" alt="Vyla Logo">
-                    </span>
-                    <i class="fas fa-arrow-left back-arrow-icon"></i>
-                    <span class="brand-text">Vyla</span>
-                </a>
-            </div>
-
-            <div class="nav-group nav-right">
-                <a href="https://discord.gg/5eqRhKeywG" target="_blank" rel="noopener noreferrer"
-                    class="nav-icon-button discord-button" aria-label="Join our Discord">
-                    <i class="fab fa-discord"></i>
-                </a>
-            </div>
-        </nav>
-
-        <div class="sticky-search">
-            <div class="hero-search-wrapper">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="stickySearchInput" placeholder="Search for games...">
-            </div>
-        </div>
-    </div>
-
-    <div class="container">
-        <div class="genres-scroll" id="genresScroll">
-            <div class="genre-pill active" data-genre="1">All Games</div>
-            <div class="genre-pill" data-genre="2">Action</div>
-            <div class="genre-pill" data-genre="3">Adventure</div>
-            <div class="genre-pill" data-genre="4">R18+</div>
-            <div class="genre-pill" data-genre="5">Shooting</div>
-            <div class="genre-pill" data-genre="6">Casual</div>
-            <div class="genre-pill" data-genre="7">Sports</div>
-            <div class="genre-pill" data-genre="8">Simulation</div>
-            <div class="genre-pill" data-genre="9">RPG</div>
-            <div class="genre-pill" data-genre="10">Strategy</div>
-            <div class="genre-pill" data-genre="11">Fighting</div>
-            <div class="genre-pill" data-genre="12">Horror</div>
-            <div class="genre-pill" data-genre="13">RTS</div>
-            <div class="genre-pill" data-genre="14">Card</div>
-            <div class="genre-pill" data-genre="15">Indie</div>
-            <div class="genre-pill" data-genre="16">LAN</div>
-        </div>
-
-        <div class="games-grid" id="gamesGrid"></div>
-
-        <div class="pagination-controls" id="pagination">
-            <a id="prevBtn" style="display: none;">Previous</a>
-            <div class="current-page" id="pageInfo">Page 1</div>
-            <a id="nextBtn" style="display: none;">Next</a>
-        </div>
-    </div>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-top">
-                <div class="footer-left">
-                    <h4>Vyla</h4>
-                    <p class="footer-tagline">Discover and download your favorite games for free. No limits, no
-                        restrictions.</p>
-                </div>
-            </div>
-            <div class="footer-bottom-links">
-                <div class="footer-legal">
-                    <a href="/privacy-policy">Privacy Policy</a>
-                    <a href="/terms-of-use">Terms of Use</a>
-                    <a href="/dmca">DMCA</a>
-                </div>
-                <div class="footer-socials">
-                    <a href="https://github.com/EndOverdosing/Vyla-Game-Scraper"><i class="fab fa-github"></i></a>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <div class="details-overlay-backdrop" id="overlayBackdrop"></div>
-
+    <pre id="output">{
+  "welcome": "vyla-games.vercel.app",
+  "description": "Free game discovery service",
+  "available_genres": [
+    {
+      "name": "All Games",
+      "url": "/?genre=1&page=1"
+    },
+    {
+      "name": "Action Games",
+      "url": "/?genre=2&page=1"
+    },
+    {
+      "name": "Adventure Games",
+      "url": "/?genre=3&page=1"
+    },
+    {
+      "name": "R18+",
+      "url": "/?genre=4&page=1"
+    },
+    {
+      "name": "Shooting Games",
+      "url": "/?genre=5&page=1"
+    },
+    {
+      "name": "Casual Games",
+      "url": "/?genre=6&page=1"
+    },
+    {
+      "name": "Sports Racing",
+      "url": "/?genre=7&page=1"
+    },
+    {
+      "name": "Simulation Business",
+      "url": "/?genre=8&page=1"
+    },
+    {
+      "name": "Role Playing",
+      "url": "/?genre=9&page=1"
+    },
+    {
+      "name": "Strategy Games",
+      "url": "/?genre=10&page=1"
+    },
+    {
+      "name": "Fighting Games",
+      "url": "/?genre=11&page=1"
+    },
+    {
+      "name": "Horror Games",
+      "url": "/?genre=12&page=1"
+    },
+    {
+      "name": "Real-time strategy",
+      "url": "/?genre=13&page=1"
+    },
+    {
+      "name": "Card Game",
+      "url": "/?genre=14&page=1"
+    },
+    {
+      "name": "Indie Games",
+      "url": "/?genre=15&page=1"
+    },
+    {
+      "name": "LAN connection",
+      "url": "/?genre=16&page=1"
+    }
+  ]
+}</pre>
+    <div id="navigation"></div>
     <script>
-        let currentPage = 1;
-        let currentGenre = '1';
-        let currentSearch = '';
-        let hasNextPage = false;
-        let cachedGreeting = "";
-        let lastScrollTop = 0;
-        let isScrollingDown = false;
-
-        const gamesGrid = document.getElementById('gamesGrid');
-        const genresScroll = document.getElementById('genresScroll');
-        const heroSearchInput = document.getElementById('heroSearchInput');
-        const stickySearchInput = document.getElementById('stickySearchInput');
-        const stickySearch = document.querySelector('.sticky-search');
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const pageInfo = document.getElementById('pageInfo');
-        const overlayBackdrop = document.getElementById('overlayBackdrop');
-        const greetingText = document.getElementById('greeting-text');
-        const minimalHeroContent = document.getElementById('minimalHeroContent');
-
-        let mouseMoveRaf;
-
-        function handleGlobalMouseMove(e) {
-            if (mouseMoveRaf) return;
-            mouseMoveRaf = requestAnimationFrame(() => {
-                const x = e.clientX || (e.touches && e.touches[0].clientX);
-                const y = e.clientY || (e.touches && e.touches[0].clientY);
-                if (x !== undefined && y !== undefined) {
-                    document.documentElement.style.setProperty('--cursor-x', `${x}px`);
-                    document.documentElement.style.setProperty('--cursor-y', `${y}px`);
-                    document.documentElement.style.setProperty('--cursor-opacity', '1');
-                }
-                mouseMoveRaf = null;
-            });
-        }
-
-        function handleGlobalMouseLeave() {
-            document.documentElement.style.setProperty('--cursor-opacity', '0');
-        }
-
-        function addInteractiveBorderListeners(element) {
-            let rect = null;
-            let rafId = null;
-            let leaveTimeout;
-
-            const updateRect = () => {
-                rect = element.getBoundingClientRect();
-            };
-
-            const handleMove = (clientX, clientY) => {
-                clearTimeout(leaveTimeout);
-                if (!rect) updateRect();
-
-                if (rafId) return;
-
-                rafId = requestAnimationFrame(() => {
-                    const x = clientX - rect.left;
-                    const y = clientY - rect.top;
-                    element.style.setProperty('--x', `${x}px`);
-                    element.style.setProperty('--y', `${y}px`);
-                    element.style.setProperty('--opacity', '1');
-                    rafId = null;
-                });
-            };
-
-            const handleLeave = () => {
-                if (rafId) cancelAnimationFrame(rafId);
-                rafId = null;
-                element.style.setProperty('--opacity', '0');
-            };
-
-            element.addEventListener('mouseenter', updateRect);
-            element.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
-            element.addEventListener('mouseleave', handleLeave);
-
-            element.addEventListener('touchstart', e => {
-                updateRect();
-                handleMove(e.touches[0].clientX, e.touches[0].clientY);
-            }, { passive: true });
-
-            element.addEventListener('touchmove', e => handleMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-
-            element.addEventListener('touchend', () => {
-                leaveTimeout = setTimeout(handleLeave, 500);
-            });
-
-            element.addEventListener('touchcancel', handleLeave);
-        }
-
-        function applyInteractiveBorders() {
-            const elements = [
-                ...document.querySelectorAll('.genre-pill'),
-                ...document.querySelectorAll('.hero-search-wrapper'),
-                ...document.querySelectorAll('.sticky-search .hero-search-wrapper'),
-                ...document.querySelectorAll('.details-overlay-pane'),
-                ...document.querySelectorAll('.download-btn')
-            ];
-
-            elements.forEach(element => {
-                if (element.dataset.interactiveBorderInit) return;
-
-                let rect = null;
-                let rafId = null;
-                let leaveTimeout;
-
-                const updateRect = () => {
-                    rect = element.getBoundingClientRect();
-                };
-
-                const handleMove = (clientX, clientY) => {
-                    clearTimeout(leaveTimeout);
-                    if (!rect) updateRect();
-
-                    if (rafId) return;
-
-                    rafId = requestAnimationFrame(() => {
-                        const x = clientX - rect.left;
-                        const y = clientY - rect.top;
-                        element.style.setProperty('--x', `${x}px`);
-                        element.style.setProperty('--y', `${y}px`);
-                        element.style.setProperty('--opacity', '1');
-                        rafId = null;
-                    });
-                };
-
-                const handleLeave = () => {
-                    if (rafId) cancelAnimationFrame(rafId);
-                    rafId = null;
-                    element.style.setProperty('--opacity', '0');
-                };
-
-                element.addEventListener('mouseenter', updateRect);
-                element.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
-                element.addEventListener('mouseleave', handleLeave);
-
-                element.addEventListener('touchstart', e => {
-                    updateRect();
-                    handleMove(e.touches[0].clientX, e.touches[0].clientY);
-                }, { passive: true });
-
-                element.addEventListener('touchmove', e => handleMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-
-                element.addEventListener('touchend', () => {
-                    leaveTimeout = setTimeout(handleLeave, 500);
-                });
-
-                element.addEventListener('touchcancel', handleLeave);
-
-                element.dataset.interactiveBorderInit = 'true';
-            });
-        }
-
-        function updateTimeBasedGreeting() {
-            if (!greetingText) return;
-            if (cachedGreeting) {
-                greetingText.innerHTML = cachedGreeting;
-                return;
-            }
-            const hour = new Date().getHours();
-            let greetings = [];
-            if (hour >= 5 && hour < 12) {
-                greetings = [
-                    "Good morning.<br>Start your day with a game.",
-                    "Rise and shine.<br>What are we playing?",
-                    "Morning.<br>Ready for some gaming?",
-                    "Top of the morning.<br>Pick your first game."
-                ];
-            } else if (hour >= 12 && hour < 17) {
-                greetings = [
-                    "Good afternoon.<br>Time for a break?",
-                    "Afternoon.<br>Dive into something new.",
-                    "Good afternoon.<br>The screen is yours.",
-                    "Midday escape.<br>What's next on the list?"
-                ];
-            } else {
-                greetings = [
-                    "Good evening.<br>Unwind with a favorite.",
-                    "Evening.<br>The night is young, play something.",
-                    "Good evening.<br>Perfect time for gaming.",
-                    "Night time.<br>Let's find a hidden gem."
-                ];
-            }
-            const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-            cachedGreeting = randomGreeting;
-            greetingText.innerHTML = randomGreeting;
-        }
-
-        function initParticles() {
-            const el = document.getElementById('hero-particles');
-            if (!el || el.children.length) return;
-            const icons = ['fa-gamepad', 'fa-dice', 'fa-chess', 'fa-puzzle-piece', 'fa-ghost', 'fa-meteor', 'fa-rocket', 'fa-crown'];
-            for (let i = 0; i < 80; i++) {
-                const p = document.createElement('i');
-                p.className = `fas ${icons[(Math.random() * icons.length) | 0]} particle`;
-                const size = 0.85 + Math.random() * 0.7;
-                const left = Math.random() * 100;
-                const yOffset = Math.random() * 200;
-                const duration = 10 + Math.random() * 20;
-                const delay = -Math.random() * 25;
-                const rotation = (90 + Math.random() * 180) * (Math.random() > 0.5 ? 1 : -1);
-                const opacity = 0.3 + Math.random() * 0.5;
-                const blur = Math.random();
-                p.style.setProperty('--p-left', `${left}%`);
-                p.style.setProperty('--p-size', `${size}rem`);
-                p.style.setProperty('--p-duration', `${duration}s`);
-                p.style.setProperty('--p-delay', `${delay}s`);
-                p.style.setProperty('--p-rotation', `${rotation}deg`);
-                p.style.setProperty('--p-opacity', opacity);
-                p.style.setProperty('--p-blur', `${blur}px`);
-                p.style.setProperty('--p-y-offset', `${yOffset}px`);
-                el.appendChild(p);
-            }
-        }
-
-        function showSkeletonCards(count = 12) {
-            gamesGrid.innerHTML = Array(count).fill(0).map(() => `
-                <div class="content-card">
-                    <div class="card-poster-wrapper">
-                        <div class="skeleton skeleton-card"></div>
-                    </div>
-                    <div class="skeleton skeleton-title"></div>
-                    <div class="skeleton skeleton-title" style="width: 60%; height: 16px;"></div>
-                </div>
-            `).join('');
-        }
-
-        function loadGames(page = 1) {
-            showSkeletonCards();
-            const params = new URLSearchParams({
-                genre: currentGenre,
-                page: page,
-                ...(currentSearch && { search: currentSearch })
-            });
-            axios.get(`/api/games?${params}`)
-                .then(response => {
-                    const games = response.data.games;
-                    hasNextPage = response.data.has_next;
-                    currentPage = response.data.page;
-                    renderGames(games);
-                    updatePagination();
-                    updateURL();
-                })
-                .catch(error => {
-                    gamesGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--secondary-text-color);">Error loading games</div>';
-                });
-        }
-
-        function renderGames(games) {
-            if (games.length === 0) {
-                gamesGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: var(--secondary-text-color);">No games found</div>';
-                return;
-            }
-            gamesGrid.innerHTML = games.map(game => `
-                <div class="content-card" onclick="showGameDetails('${game.id}')">
-                    <div class="card-poster-wrapper">
-                        <img src="${game.image_url}" alt="${game.title}" class="content-card-poster" onerror="this.src='https://via.placeholder.com/300x450/222/444?text='">
-                    </div>
-                    <div class="content-card-title">${game.title}</div>
-                </div>
-            `).join('');
-        }
-
-        function updatePagination() {
-            pageInfo.textContent = `Page ${currentPage}`;
-            prevBtn.style.display = currentPage > 1 ? 'flex' : 'none';
-            nextBtn.style.display = hasNextPage ? 'flex' : 'none';
-        }
-
-        function updateURL() {
-            let url = '/';
-            if (currentSearch) {
-                url = `/search?q=${encodeURIComponent(currentSearch)}`;
-                if (currentPage > 1) url += `&page=${currentPage}`;
-            } else if (currentGenre !== '1') {
-                url = `/?genre=${currentGenre}`;
-                if (currentPage > 1) url += `&page=${currentPage}`;
-            } else if (currentPage > 1) {
-                url = `/?page=${currentPage}`;
-            }
-            window.history.replaceState({}, '', url);
-        }
-
-        function showGameDetails(gameId) {
-            window.history.pushState({ gameId }, '', `/game/${gameId}`);
-            document.body.classList.add('details-open');
-            overlayBackdrop.style.display = 'block';
-            overlayBackdrop.innerHTML = `
-        <div class="details-overlay-pane">
-            <button class="details-overlay-close" onclick="closeGameDetails()"><i class="fas fa-times"></i></button>
-            <div class="details-overlay-scroll-container">
-                <div class="details-overlay-header-wrapper">
-                    <div class="details-overlay-background skeleton" style="background-color: var(--glass-base-bg);"></div>
-                    <div class="details-overlay-header-content">
-                        <div class="skeleton" style="height: 60px; width: 80%; margin-bottom: 20px;"></div>
-                        <div class="skeleton" style="height: 24px; width: 60%;"></div>
-                    </div>
-                </div>
-                <div class="details-overlay-body-content">
-                    <div class="skeleton" style="height: 120px; margin-bottom: 30px;"></div>
-                    <div class="skeleton" style="height: 200px; margin-bottom: 30px;"></div>
-                    <div class="skeleton" style="height: 50px;"></div>
-                </div>
-            </div>
-        </div>
-    `;
-            setTimeout(() => {
-                const pane = document.querySelector('.details-overlay-pane');
-                if (pane) pane.style.transform = window.innerWidth <= 768 ? 'none' : 'translate(-50%, -50%) scale(1)';
-
-                requestAnimationFrame(() => {
-                    applyInteractiveBorders();
-                });
-            }, 10);
-
-            axios.get(`/api/game/${gameId}`)
-                .then(response => {
-                    const details = response.data;
-                    let mediaHTML = '';
-                    if (details.videos && details.videos.length > 0) {
-                        mediaHTML += `
-                    <div class="media-gallery">
-                        <div class="gallery-title">Videos</div>
-                        <div class="videos-carousel">
-                            <div class="videos-track" id="videosTrack">
-                                ${details.videos.map(video => `
-                                    <div class="video-item">
-                                        <video controls>
-                                            <source src="${video}" type="video/mp4">
-                                        </video>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            ${window.innerWidth > 768 ? `
-                                <div class="carousel-arrow prev" onclick="scrollVideos(-300)"><i class="fas fa-chevron-left"></i></div>
-                                <div class="carousel-arrow next" onclick="scrollVideos(300)"><i class="fas fa-chevron-right"></i></div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-                    }
-                    if (details.content_images && details.content_images.length > 0) {
-                        mediaHTML += `
-                    <div class="media-gallery">
-                        <div class="gallery-title">Screenshots</div>
-                        <div class="images-grid">
-                            ${details.content_images.slice(0, 6).map(img => `
-                                <img src="${img}" class="gallery-image" onclick="window.open('${img}', '_blank')">
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                    }
-
-                    const descriptionHTML = details.full_description ? `
-                <div class="description-section">
-                    <div class="description-content">${formatDescription(details.full_description)}</div>
-                </div>
-            ` : '';
-
-                    overlayBackdrop.innerHTML = `
-                <div class="details-overlay-pane">
-                    <button class="details-overlay-close" onclick="closeGameDetails()"><i class="fas fa-times"></i></button>
-                    <div class="details-overlay-scroll-container">
-                        <div class="details-overlay-header-wrapper">
-                            <div class="details-overlay-background" style="background-image: url('${details.capsule_image || ''}');"></div>
-                            <div class="details-overlay-header-content">
-                                <h1 class="details-overlay-title">${details.title}</h1>
-                                <div class="meta-info-overlay">
-                                    ${details.file_size ? `<span><i class="fas fa-hdd"></i> ${details.file_size}</span>` : ''}
-                                    ${details.version ? `<span><i class="fas fa-code-branch"></i> ${details.version}</span>` : ''}
-                                    ${details.game_id ? `<span><i class="fas fa-id-card"></i> ${details.game_id}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="details-overlay-body-content">
-                            ${descriptionHTML}
-                            ${mediaHTML}
-                            <div class="download-section">
-                                <button class="download-btn" id="downloadBtn" onclick="getDownloadUrl('${details.game_id}', '${details.title}')">
-                                    <div class="download-btn-content">
-                                        <div class="loading-spinner" id="downloadSpinner" style="display: none;"></div>
-                                        <span id="downloadText">Fetch Download Link</span>
-                                    </div>
-                                </button>
-                                <div class="debug-message" id="debugMessage" style="display: none;"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-                    setTimeout(() => {
-                        const pane = document.querySelector('.details-overlay-pane');
-                        if (pane) pane.style.transform = window.innerWidth <= 768 ? 'none' : 'translate(-50%, -50%) scale(1)';
-                    }, 10);
-                })
-                .catch(error => {
-                    overlayBackdrop.innerHTML = `
-                <div class="details-overlay-pane">
-                    <button class="details-overlay-close" onclick="closeGameDetails()"><i class="fas fa-times"></i></button>
-                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--secondary-text-color);">
-                        Failed to load game details
-                    </div>
-                </div>
-            `;
-                });
-        }
-
-        function closeGameDetails() {
-            document.body.classList.remove('details-open');
-            overlayBackdrop.style.display = 'none';
-            overlayBackdrop.innerHTML = '';
-            window.history.back();
-        }
-
-        function formatDescription(text) {
-            if (!text) return '';
-            const paragraphs = text.split('|||');
-            return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
-        }
-
-        function scrollVideos(amount) {
-            const track = document.getElementById('videosTrack');
-            if (track) {
-                track.scrollBy({ left: amount, behavior: 'smooth' });
-            }
-        }
-
-        async function getDownloadUrl(gameId, gameTitle) {
-            const downloadBtn = document.getElementById('downloadBtn');
-            const downloadText = document.getElementById('downloadText');
-            const downloadSpinner = document.getElementById('downloadSpinner');
-            const debugMessage = document.getElementById('debugMessage');
-
-            console.log('[DEBUG] Fetching download URL for game:', gameId);
-
-            downloadBtn.disabled = true;
-            downloadSpinner.style.display = 'block';
-            downloadText.textContent = 'Fetching link...';
-            debugMessage.style.display = 'block';
-            debugMessage.textContent = 'Contacting download server...';
-            debugMessage.style.color = 'var(--secondary-text-color)';
-
-            try {
-                console.log('[DEBUG] Sending request to /api/download/' + gameId);
-                const response = await axios.get(`/api/download/${gameId}`);
-                console.log('[DEBUG] Response received:', response.data);
-
-                if (response.data.url && response.data.url !== 'rate_limited') {
-                    const downloadUrl = response.data.url;
-                    console.log('[DEBUG] Download URL obtained:', downloadUrl);
-
-                    downloadSpinner.style.display = 'none';
-                    downloadText.textContent = 'Download Now';
-                    debugMessage.innerHTML = 'Link ready! <a href="' + downloadUrl + '" download style="color: #4ade80; text-decoration: underline;">Click here to download</a> or use the button.';
-                    debugMessage.style.color = '#4ade80';
-
-                    downloadBtn.disabled = false;
-                    downloadBtn.onclick = function () {
-                        console.log('[DEBUG] Opening download URL');
-                        window.location.href = downloadUrl;
-
-                        downloadText.textContent = 'Download Started!';
-                        debugMessage.textContent = 'Download should begin shortly. Check your downloads folder.';
-                        debugMessage.style.color = '#4ade80';
-
-                        setTimeout(() => {
-                            downloadText.textContent = 'Fetch Download Link';
-                            downloadBtn.onclick = () => getDownloadUrl(gameId, gameTitle);
-                            debugMessage.textContent = '';
-                        }, 3000);
-                    };
-
-                } else if (response.data.error === 'rate_limited') {
-                    console.log('[DEBUG] Rate limited by server');
-                    downloadSpinner.style.display = 'none';
-                    downloadBtn.classList.add('rate-limited');
-                    let countdown = 60;
-                    debugMessage.textContent = `Rate limited by Koyso server. Please wait ${countdown} seconds...`;
-                    debugMessage.style.color = '#f87171';
-
-                    const countdownInterval = setInterval(() => {
-                        downloadText.textContent = `Wait (${countdown}s)`;
-                        debugMessage.textContent = `Rate limited by Koyso server. Please wait ${countdown} seconds...`;
-                        countdown--;
-                        if (countdown < 0) {
-                            clearInterval(countdownInterval);
-                            downloadBtn.classList.remove('rate-limited');
-                            downloadText.textContent = 'Fetch Download Link';
-                            downloadBtn.disabled = false;
-                            debugMessage.style.display = 'none';
-                        }
-                    }, 1000);
-                } else {
-                    throw new Error('No download URL received');
-                }
-            } catch (error) {
-                console.error('[DEBUG] Error fetching download:', error);
-                downloadSpinner.style.display = 'none';
-                downloadText.textContent = 'Failed';
-
-                if (error.response?.data?.error === 'cooldown') {
-                    const waitTime = error.response.data.wait || 10;
-                    debugMessage.textContent = `Please wait ${waitTime} seconds between download requests.`;
-                    debugMessage.style.color = '#f87171';
-                    setTimeout(() => {
-                        downloadText.textContent = 'Fetch Download Link';
-                        downloadBtn.disabled = false;
-                        debugMessage.style.display = 'none';
-                    }, waitTime * 1000);
-                } else if (error.response?.status === 429) {
-                    debugMessage.textContent = 'Too many requests. Server is rate limiting. Wait 60 seconds.';
-                    debugMessage.style.color = '#f87171';
-                    setTimeout(() => {
-                        downloadText.textContent = 'Fetch Download Link';
-                        downloadBtn.disabled = false;
-                        debugMessage.style.display = 'none';
-                    }, 60000);
-                } else {
-                    debugMessage.textContent = 'Server error. Please try again.';
-                    debugMessage.style.color = '#f87171';
-                    setTimeout(() => {
-                        downloadText.textContent = 'Fetch Download Link';
-                        downloadBtn.disabled = false;
-                        debugMessage.style.display = 'none';
-                    }, 3000);
-                }
-            }
-        }
-
-        function performSearch(query) {
-            currentSearch = query;
-            currentPage = 1;
-            loadGames();
-            updateURL();
-        }
-
-        genresScroll.addEventListener('click', (e) => {
-            if (e.target.classList.contains('genre-pill')) {
-                document.querySelectorAll('.genre-pill').forEach(p => p.classList.remove('active'));
-                e.target.classList.add('active');
-                currentGenre = e.target.dataset.genre;
-                currentSearch = '';
-                heroSearchInput.value = '';
-                stickySearchInput.value = '';
-                currentPage = 1;
-                loadGames();
-            }
-        });
-
-        heroSearchInput.addEventListener('input', debounce(() => {
-            performSearch(heroSearchInput.value.trim());
-        }, 500));
-
-        stickySearchInput.addEventListener('input', debounce(() => {
-            performSearch(stickySearchInput.value.trim());
-        }, 500));
-
-        heroSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performSearch(heroSearchInput.value.trim());
-        });
-
-        stickySearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performSearch(stickySearchInput.value.trim());
-        });
-
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 1) loadGames(currentPage - 1);
-        });
-
-        nextBtn.addEventListener('click', () => {
-            if (hasNextPage) loadGames(currentPage + 1);
-        });
-
-        window.addEventListener('scroll', () => {
-            const st = window.pageYOffset || document.documentElement.scrollTop;
-            const heroBottom = document.getElementById('minimal-hero-container').getBoundingClientRect().bottom;
-            const heroHeight = document.getElementById('minimal-hero-container').offsetHeight;
-
-            isScrollingDown = st > lastScrollTop;
-            lastScrollTop = st <= 0 ? 0 : st;
-
-            if (heroBottom < 0) {
-                stickySearch.classList.add('visible');
-                if (isScrollingDown) {
-                    minimalHeroContent.classList.add('hidden');
-                } else {
-                    minimalHeroContent.classList.remove('hidden');
-                }
-            } else {
-                stickySearch.classList.remove('visible');
-                minimalHeroContent.classList.remove('hidden');
-            }
-        });
-
-        window.addEventListener('popstate', (e) => {
-            const path = window.location.pathname;
-            const searchParams = new URLSearchParams(window.location.search);
-            if (path.startsWith('/game/')) {
-                const gameId = path.split('/')[2];
-                showGameDetails(gameId);
-            } else {
-                document.body.classList.remove('details-open');
-                overlayBackdrop.style.display = 'none';
-                overlayBackdrop.innerHTML = '';
-                if (path === '/search') {
-                    const query = searchParams.get('q') || '';
-                    heroSearchInput.value = query;
-                    stickySearchInput.value = query;
-                    currentSearch = query;
-                    currentPage = parseInt(searchParams.get('page') || '1');
-                    loadGames(currentPage);
-                } else {
-                    const genre = searchParams.get('genre') || '1';
-                    currentGenre = genre;
-                    document.querySelectorAll('.genre-pill').forEach(p => p.classList.remove('active'));
-                    document.querySelector(`.genre-pill[data-genre="${genre}"]`)?.classList.add('active');
-                    currentSearch = '';
-                    heroSearchInput.value = '';
-                    stickySearchInput.value = '';
-                    currentPage = parseInt(searchParams.get('page') || '1');
-                    loadGames(currentPage);
-                }
-            }
-        });
-
-        document.addEventListener('touchstart', function () { }, { passive: true });
-
-        document.addEventListener('touchstart', function (e) {
-            const card = e.target.closest('.content-card');
-            if (card) {
-                card.classList.add('touched');
-            }
-        });
-
-        document.addEventListener('touchend', function (e) {
-            const card = e.target.closest('.content-card');
-            if (card) {
-                setTimeout(() => {
-                    card.classList.remove('touched');
-                }, 150);
-            }
-        });
-
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-        function initFromURL() {
-            const path = window.location.pathname;
-            const searchParams = new URLSearchParams(window.location.search);
-            if (path.startsWith('/game/')) {
-                const gameId = path.split('/')[2];
-                showGameDetails(gameId);
-                return;
-            }
-            if (path === '/search') {
-                const query = searchParams.get('q') || '';
-                heroSearchInput.value = query;
-                stickySearchInput.value = query;
-                currentSearch = query;
-                currentPage = parseInt(searchParams.get('page') || '1');
-            } else {
-                const genre = searchParams.get('genre') || '1';
-                currentGenre = genre;
-                document.querySelectorAll('.genre-pill').forEach(p => p.classList.remove('active'));
-                document.querySelector(`.genre-pill[data-genre="${genre}"]`)?.classList.add('active');
-                currentPage = parseInt(searchParams.get('page') || '1');
-            }
-            loadGames(currentPage);
-        }
-
-        updateTimeBasedGreeting();
-        initParticles();
-        initFromURL();
+        setTimeout(() => {
+            attachClickListeners();
+        }, 10);
     </script>
 </body>
 

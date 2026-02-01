@@ -1,136 +1,160 @@
+![Vyla Game Scraper Logo](/static/images/github-banner.jpg)
+
 # Vyla Game Scraper
 
-A Flask web application that scrapes games from Vyla (koyso.com), providing a JSON-based interface to browse games, view details, and retrieve download links.
+A Flask-based web application that scrapes and proxies game data from koyso.com, exposing a clean JSON API and a single-page web interface for browsing, searching, viewing details, and generating final download links.
 
 ## Features
 
-* Browse games by genre with pagination
-* Search games by title or keywords
-* View detailed game information (title, description, file size, version, images, videos)
-* Retrieve final download links with rate limiting and cooldown protection
-* Clean JSON API responses
-* Dynamic single-page web interface
-* Browser history support with working back button navigation
+• Browse games by genre with pagination
+• Keyword search with paged results
+• Detailed game metadata (title, description, size, version)
+• Image and video extraction with deduplication and format preference
+• Final download URL generation via site API emulation
+• Per-game download cooldown and rate-limit handling
+• Health check endpoint
+• SPA routing with history/back-button support
+• JSON-first API design
 
 ## Requirements
 
-* Python 3.x
-* Flask
-* Standard libraries: `urllib`, `re`, `json`, `html`, `hashlib`, `time`, `http.cookiejar`
+• Python 3.9+
+• Flask
+• Standard library only (urllib, re, json, html, hashlib, time, http.cookiejar)
 
 ## Installation
 
-1. Clone the repository
-2. Install dependencies:
-
 ```bash
+git clone <repo>
+cd <repo>
 pip install flask
 ```
 
-## Usage
-
-### Running the Server
+## Running
 
 ```bash
 python app.py
 ```
 
-The server will start at `http://127.0.0.1:5000`
+Server runs at:
 
-### Web Interface
-
-Open your browser and navigate to `http://127.0.0.1:5000`
-
-The interface provides:
-* Browse all games or filter by genre
-* Search functionality
-* Click-through navigation to game details
-* Direct download link generation
-* Browser back button support
-
-### API Endpoints
-
-#### Get Games
 ```
-GET /api/games?genre={genre_id}&page={page_number}&search={query}
+http://127.0.0.1:5000
 ```
 
-Returns paginated list of games with navigation links.
+## Web Interface
 
-#### Get Game Details
+Access `/` in a browser.
+
+Supports:
+• Genre browsing
+• Search
+• Game detail views
+• Download link generation
+• Proper browser history navigation
+
+## API Endpoints
+
+### Health Check
+
+```
+GET /api/health
+```
+
+Returns scraper, connectivity, and API status.
+
+### List Games
+
+```
+GET /api/games?genre={id}&page={n}&search={query}
+```
+
+### Search (Path-Based)
+
+```
+GET /search/{query}?page={n}
+```
+
+### Game Details
+
 ```
 GET /api/game/{game_id}
 ```
 
-Returns detailed information about a specific game including images, videos, and download endpoint.
+Returns:
+• Title
+• Full description
+• File size
+• Version
+• Images (up to 10)
+• Videos (up to 5)
+• Recommendations
+• Download page metadata
 
-#### Get Download URL
+### Download URL
+
 ```
 GET /api/download/{game_id}
+GET /game/{game_id}/download
 ```
 
-Returns the final download URL for a game. Subject to rate limiting.
+Returns final direct download URL or cooldown/rate-limit status.
 
-## Available Genres
+## Genres
 
 1. All Games
-2. Action Games
-3. Adventure Games
+2. Action
+3. Adventure
 4. R18+
-5. Shooting Games
-6. Casual Games
-7. Sports Racing
-8. Simulation Business
-9. Role Playing
-10. Strategy Games
-11. Fighting Games
-12. Horror Games
-13. Real-time strategy
-14. Card Game
-15. Indie Games
-16. LAN connection
+5. Shooting
+6. Casual
+7. Sports / Racing
+8. Simulation / Business
+9. RPG
+10. Strategy
+11. Fighting
+12. Horror
+13. RTS
+14. Card
+15. Indie
+16. LAN
 
 ## Configuration
 
-The `VylaScraper` class includes configurable options:
+Inside `VylaScraper`:
 
-* `request_delay` - Delay between requests (default: 0.05s)
-* `download_cooldown` - Cooldown period between download requests (default: 10s)
-* `secret_key` - Authentication key for download API
+• `request_delay` – delay between HTTP requests (default: 0.05s)
+• `download_cooldown` – per-game cooldown in seconds (default: 10s)
+• `secret_key` – hash salt used for download API authentication
 
 ## Rate Limiting
 
-The application implements:
-* Per-game download cooldown (10 seconds)
-* Server-side rate limit detection
-* Automatic cooldown enforcement
+• Per-game cooldown enforcement
+• HTTP 429 handling
+• Cookie-based temporary blocking
+• Automatic wait-time responses
 
 ## How It Works
 
-1. **Scraping**: Uses `urllib` to fetch and parse HTML from koyso.com
-2. **Authentication**: Generates SHA256 hashes for download requests
-3. **Download Links**: Retrieves final download URLs through the site's API
-4. **Frontend**: Single-page application with history state management
-
-## Navigation
-
-* Click any `/api/*` link to navigate
-* Back button properly navigates through history
-* URL query parameters maintain state (`?genre=X&page=Y`)
+• Scrapes HTML using urllib with browser-like headers
+• Parses content via regex (no external parsers)
+• Emulates download API authentication using SHA-256
+• Injects required cookies and headers
+• Normalizes and filters media assets
+• Serves everything through a SPA-friendly Flask router
 
 ## Error Handling
 
-The application handles:
-* Network errors
-* Rate limiting
-* Download cooldowns
-* Invalid responses
-* Missing game data
+• Network and decode failures
+• API format changes
+• Rate limiting and cooldown violations
+• Missing or invalid game data
+• Graceful JSON error responses
 
 ## Disclaimer
 
-This application interacts with a third-party website. Use responsibly and ensure compliance with the website's terms of service. Unauthorized distribution or use may be illegal.
+This project interacts with a third-party website. Use responsibly and ensure compliance with applicable laws and the site’s terms of service. The author assumes no liability for misuse.
 
 ## License
 
-For educational purposes only.
+Educational use only.

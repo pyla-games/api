@@ -1,0 +1,52 @@
+{
+    "name": "Vyla Games",
+    "short_name": "Vyla Games",
+    "description": "Download free games with Vyla Games. No limits, no restrictions.",
+    "start_url": "/",
+    "scope": "/",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "display": "standalone",
+    "background_color": "transparent",
+    "theme_color": "transparent",
+    "orientation": "any",
+    "prefer_related_applications": false,
+    "related_applications": [],
+    "icons": [
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/images/icon.png",
+            "sizes": "16x16",
+            "type": "image/png"
+        }
+    ]
+}

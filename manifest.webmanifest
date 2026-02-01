@@ -16,35 +16,35 @@
     "related_applications": [],
     "icons": [
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any"
         },
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
         },
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "180x180",
             "type": "image/png"
         },
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "32x32",
             "type": "image/png"
         },
         {
-            "src": "/static/images/icon.png",
+            "src": "/static/images/manifest-icon.png",
             "sizes": "16x16",
             "type": "image/png"
         }

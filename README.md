@@ -157,4 +157,4 @@ This project interacts with a third-party website. Use responsibly and ensure co
 
 ## License
 
-Educational use only.
+See the [LICENSE](LICENSE) file for details.

@@ -1,4 +1,4 @@
-![Vyla Game Scraper Logo](/static/images/github-banner.jpg)
+![Vyla Game Scraper Logo](https://vyla-games.vercel.app/static/images/github-banner.png)
 
 # Vyla Game Scraper
 

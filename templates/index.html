@@ -190,7 +190,6 @@
 
     async function showGenres() {
         try {
-            // Check system health
             const healthResponse = await fetch('/api/health');
             let systemStatus = 'unknown';
 
@@ -243,7 +242,6 @@
                 attachClickListeners();
             }, 10);
         } catch (error) {
-            // Fallback if health check fails
             const genres = [
                 { "id": "1", "name": "All Games", "url": `/?genre=1&page=1` },
                 { "id": "2", "name": "Action Games", "url": `/?genre=2&page=1` },

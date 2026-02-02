@@ -2,30 +2,63 @@
 
 # Vyla Games API
 
-A Flask-based JSON API and zero-UI web interface for game discovery and downloads. Scrapes game data from koyso.com and serves it through scraper-friendly endpoints with proxied media assets.
+A modern Flask-based game discovery and download API. Scrapes game data from koyso.com and provides a responsive web interface with full JSON API support.
+
+---
+
+## Table of Contents
+
+* [Features](#features)
+* [Quick Start](#quick-start)
+* [Web Interface](#web-interface)
+* [API Documentation](#api-documentation)
+* [Available Genres](#available-genres)
+* [Configuration](#configuration)
+* [Architecture](#architecture)
+* [Frontend Customization](#frontend-customization)
+* [Debugging](#debugging)
+* [Deployment Options](#deployment-options)
+* [CORS & Security](#cors--security)
+* [Error Handling](#error-handling)
+* [Example Usage](#example-usage)
+* [Contributing](#contributing)
+* [Disclaimer](#disclaimer)
+* [License](#license)
+* [Acknowledgments](#acknowledgments)
+
+---
 
 ## Features
 
-* **Pure JSON API** – All endpoints return clean JSON responses.
-* **Zero-UI Interface** – Clickable JSON navigation for browsers.
-* **Unified Endpoints** – Same paths work for both API users and web browsers.
-* **Proxied Media** – Images and videos served via `/image/` and `/video/` paths.
-* **Direct Downloads** – `/api/download/{game_id}` generates real download URLs with cooldown handling.
-* **Smart Detection** – Returns JSON for scrapers, HTML for browsers.
-* **Genre Browsing** – 16 game categories with pagination.
-* **Keyword Search** – Full-text search with page navigation.
-* **Detailed Metadata** – Title, description, size, version, images, videos, and recommendations.
-* **Download Generation** – Authenticated API calls with SHA-256 hashing and cooldowns.
-* **Health Monitoring** – System status and connectivity checks.
-* **History Support** – Browser back/forward navigation works.
+<details>
+<summary>Click to expand</summary>
 
-## Requirements
+* Responsive web interface with modern design
+* Complete RESTful JSON API
+* Stateless architecture for serverless deployment
+* Full CORS support
+* No rate limits on downloads
+* Media proxy for images and videos
+* 16 game categories including Action, RPG, Horror, and more
+* Full-text search with pagination
+* Rich metadata including screenshots, videos, descriptions, and recommendations
+* Mobile responsive
+
+</details>
+
+---
+
+## Quick Start
+
+<details>
+<summary>Click to expand</summary>
+
+### Requirements
 
 * Python 3.9+
 * Flask
-* Standard library only (`urllib`, `re`, `json`, `html`, `hashlib`, `time`, `http.cookiejar`)
 
-## Installation
+### Installation
 
 ```bash
 git clone <repo>
@@ -33,178 +66,254 @@ cd <repo>
 pip install flask
 ```
 
-## Running
+### Running Locally
 
 ```bash
-python app.py
+python app_final.py
 ```
 
-Server runs at:
+Server runs at `http://127.0.0.1:5000`
 
-```
-http://127.0.0.1:5000
-```
+### Deploy to Vercel
 
-## Web Interface
+1. Install Vercel CLI:
 
-Access `/` in a browser for a zero-UI interface:
-
-* Interactive JSON navigation.
-* Clickable links in JSON responses.
-* Browser history support.
-* Mobile-friendly viewport.
-
-## API Endpoints
-
-### Health Check
-
-```
-GET /api/health
+```bash
+npm i -g vercel
 ```
 
-Returns:
+2. Create `vercel.json`:
 
 ```json
 {
-  "status": "healthy|degraded|fail",
-  "checks": {
-    "scraping": true,
-    "connectivity": true,
-    "api_responsive": true
-  },
-  "timestamp": 1769996310
+  "version": 2,
+  "builds": [
+    { "src": "app_final.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "app_final.py" }
+  ]
 }
 ```
 
-### Available Genres
+3. Deploy:
+
+```bash
+vercel --prod
+```
+
+</details>
+
+---
+
+## Web Interface
+
+<details>
+<summary>Click to expand</summary>
+
+* Browse games by genre
+* Search games by name
+* Grid layout with cards
+* Game details modal (screenshots, videos, description)
+* One-click downloads
+* Recommendations
+* Pagination
+
+</details>
+
+---
+
+## API Documentation
+
+<details>
+<summary>Click to expand</summary>
+
+### Base URL
 
 ```
+Production: https://vyla-games.vercel.app
+Local: http://127.0.0.1:5000
+```
+
+### Endpoints
+
+<details>
+<summary>Health Check</summary>
+
+```http
+GET /api/health
+```
+
+**Response:**
+
+```json
+{
+  "status": "healthy",
+  "games_found": 42,
+  "timestamp": 1738368000
+}
+```
+
+</details>
+
+<details>
+<summary>List Genres</summary>
+
+```http
 GET /api/genres
 ```
 
-Returns all genres with metadata and endpoints.
+**Response:**
 
-### List Games
-
+```json
+{
+  "api_version": "2.0",
+  "total_genres": 16,
+  "genres": [
+    { "id": "1", "name": "All Games", "url": "/api/games?genre=1&page=1" }
+  ]
+}
 ```
+
+</details>
+
+<details>
+<summary>Browse Games</summary>
+
+```http
 GET /api/games?genre={id}&page={n}
-GET /api/games?search={query}&page={n}
 ```
 
-Parameters:
+**Parameters:**
 
-* `genre` – Genre ID (1–16).
-* `search` – Optional search query.
-* `page` – Page number (starts at 1).
+* `genre` – Genre ID (1-16, default 1)
+* `page` – Page number (default 1)
 
-Returns:
+**Response:**
 
 ```json
 {
   "status": "success",
   "genre": "Action Games",
+  "genre_id": "2",
+  "total_results": 42,
   "page": 1,
   "has_next": true,
-  "total_results": 20,
   "games": [
-    {
-      "title": "Game Title",
-      "id": "1927",
-      "image_url": "/image/app_id/screenshot.jpg",
-      "view": "/api/game/1927"
-    }
+    { "title": "Game Title", "id": "1927", "image_url": "/proxy/aHR0cHM6Ly9...", "view": "/api/game/1927" }
   ],
-  "next": "/api/games?genre=2&page=2",
   "previous": null,
-  "back": "/"
+  "next": "/api/games?genre=2&page=2"
 }
 ```
 
-### Search (Path-Based)
+</details>
 
-```
-GET /search/{query}?page={n}
-```
+<details>
+<summary>Search Games</summary>
 
-Alternative clean URL for searches; same response as `?search=` query.
-
-### Game Details
-
-```
-GET /api/game/{game_id}
-GET /game/{game_id}
+```http
+GET /api/search?q={query}&page={n}
 ```
 
-Both return identical JSON.
+**Parameters:**
+
+* `q` – Search query (required)
+* `page` – Page number (default 1)
+
+**Response:**
 
 ```json
 {
-  "title": "Game Title",
+  "status": "success",
+  "search_query": "minecraft",
+  "total_results": 15,
+  "page": 1,
+  "has_next": true,
+  "games": [...],
+  "previous": null,
+  "next": "/api/search?q=minecraft&page=2"
+}
+```
+
+</details>
+
+<details>
+<summary>Game Details</summary>
+
+```http
+GET /api/game/{game_id}
+```
+
+**Response:**
+
+```json
+{
   "id": "1927",
-  "full_description": "Full game description",
-  "size": "800MB",
-  "version": "v1.0",
-  "media": {
-    "images": ["/image/app_id/screenshot1.jpg"],
-    "videos": ["/video/app_id/trailer.webm"]
-  },
+  "title": "Game Title",
+  "full_description": "Paragraph 1|||Paragraph 2|||Paragraph 3",
+  "size": "2.5GB",
+  "version": "v1.0.5",
+  "media": { "images": ["/proxy/aHR0cHM6Ly9..."], "videos": ["/proxy/aHR0cHM6Ly9..."] },
   "recommendations": [
-    {
-      "id": "1930",
-      "title": "Related Game",
-      "image_url": "/image/1930/screenshot.jpg",
-      "view": "/api/game/1930"
-    }
+    { "id": "1930", "title": "Similar Game", "image_url": "/proxy/aHR0cHM6Ly9...", "view": "/api/game/1930" }
   ],
   "download_url": "/api/download/1927",
   "back": "/"
 }
 ```
 
-### Download URL Generation
+</details>
 
-```
+<details>
+<summary>Get Download Link</summary>
+
+```http
 GET /api/download/{game_id}
-GET /game/{game_id}/download
 ```
 
-Returns:
+**Response:**
 
 ```json
 {
   "status": "success",
-  "download_url": "https://cdn.example.com/game.7z?verify=..."
+  "download_url": "https://cdn.example.com/game.7z?token=..."
 }
 ```
 
-Error responses:
+**Error Response:**
 
 ```json
 {
-  "error": "cooldown",
-  "wait_seconds": 5,
-  "back": "/"
+  "error": "Download service unavailable"
 }
 ```
 
-* **Cooldown** – 10 seconds per game between download requests.
-* **Rate-limited** – Handles upstream 429 errors.
-* **Unified** – Both paths work identically.
+</details>
 
-### Proxied Media
+<details>
+<summary>Proxied Media</summary>
 
-```
-GET /image/{path}
-GET /video/{path}
+```http
+GET /proxy/{base64_url}
 ```
 
-* Proxies all images/videos from upstream.
-* Returns proper content type and caching headers.
-* URLs match those in API responses.
+* Decodes base64 URL
+* Fetches media from upstream
+* Returns content with proper headers and caching
 
-## Genres
+</details>
 
-| ID | Name                |
+</details>
+
+---
+
+## Available Genres
+
+<details>
+<summary>Click to expand</summary>
+
+| ID | Genre Name          |
 | -- | ------------------- |
 | 1  | All Games           |
 | 2  | Action Games        |
@@ -223,112 +332,229 @@ GET /video/{path}
 | 15 | Indie Games         |
 | 16 | LAN connection      |
 
+</details>
+
+---
+
 ## Configuration
 
-Inside `VylaScraper` class:
+<details>
+<summary>Click to expand</summary>
 
-* `base_url` – Upstream site (`https://koyso.com`).
-* `request_delay` – Delay between requests (default 0.05s).
-* `download_cooldown` – Per-game cooldown (default 10s).
-* `secret_key` – SHA-256 hash salt for download URL generation.
-* `url_cache` – Stores proxied URLs in memory.
+Key settings in `VylaScraper`:
 
-## How It Works
+```python
+self.base_url = "https://koyso.com"
+self.request_delay = 0.05
+self.secret_key = "f6i6@m29r3fwi^yqd"
+```
 
-### Scraping
+</details>
 
-* Fetches HTML with browser-like headers.
-* Extracts game metadata, images, and videos using regex.
-* Deduplicates media with format preference: `.webp > .avif > .png > .jpg > .jpeg > .gif`.
+---
 
-### Download Authentication
+## Architecture
 
-* Generates SHA-256 hash: `timestamp + game_id + secret_key`.
-* POSTs to `/api/getGamesDownloadUrl` upstream.
-* Includes cookies `site_auth=1; key=NBQEah#h@6qHr7T!k`.
-* Handles cooldowns and rate-limited responses.
+<details>
+<summary>Click to expand</summary>
 
-### Media Proxying
+**Stateless Design:** Base64 URL encoding allows serverless deployment.
 
-* `/image/` and `/video/` paths map to original URLs via `url_cache`.
-* Sets `Content-Type`, caching headers, and CORS (`*`) for cross-site use.
+**Workflow:**
 
-### Smart Response Format
+1. Scraping – Fetch HTML from koyso.com
+2. Parsing – Extract game data, images, videos
+3. Encoding – Media URLs base64-encoded
+4. API Response – JSON with encoded proxy URLs
+5. Media Proxy – Decodes and serves content
 
-* Detects `Accept: application/json` header.
-* Returns JSON for scrapers, HTML for browsers.
+**Download Authentication:** SHA-256 signed requests to get final download links.
+
+</details>
+
+---
+
+## Frontend Customization
+
+<details>
+<summary>Click to expand</summary>
+
+Edit `index.html` to modify:
+
+* Colors and gradients
+* API base URL
+* Grid layout
+* Card styling
+
+</details>
+
+---
+
+## Debugging
+
+<details>
+<summary>Click to expand</summary>
+
+Enable debug logs:
+
+```python
+DEBUG = True
+```
+
+Logs include all HTTP requests, scraping results, proxy activity, and download authentication.
+
+</details>
+
+---
+
+## Deployment Options
+
+<details>
+<summary>Click to expand</summary>
+
+* Vercel: `vercel --prod`
+* Railway: `railway up`
+* Heroku: `git push heroku main`
+* Docker:
+
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+COPY . .
+RUN pip install flask
+CMD ["python", "app_final.py"]
+```
+
+* Traditional server:
+
+```bash
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 app_final:app
+```
+
+</details>
+
+---
+
+## CORS & Security
+
+<details>
+<summary>Click to expand</summary>
+
+* Full CORS support
+* JSON content-type headers
+* OPTIONS preflight handling
+* Public API, no authentication required
+
+</details>
+
+---
 
 ## Error Handling
+
+<details>
+<summary>Click to expand</summary>
 
 All errors return JSON:
 
 ```json
-{
-  "error": "Description",
-  "back": "/"
-}
+{ "error": "Error description" }
 ```
 
-Common errors:
+HTTP Status Codes: 200 (Success), 400 (Bad request), 404 (Not found), 500 (Server error)
 
-* `Game not found` – 404
-* `cooldown` – 429, includes `wait_seconds`
-* `rate_limited` – 429 upstream
-* Proxy errors – 500
+</details>
 
-## Debugging
+---
 
-Enable debug mode:
+## Example Usage
+
+<details>
+<summary>Click to expand</summary>
+
+### Python
 
 ```python
-if __name__ == '__main__':
-    app.run(debug=True)
+import requests
+
+response = requests.get('https://vyla-games.vercel.app/api/games?genre=2&page=1')
+games = response.json()['games']
+
+for game in games:
+    print(f"{game['title']} - {game['id']}")
 ```
 
-Includes:
+### JavaScript
 
-* Timestamp and signature logs
-* Upstream POST data and responses
-* Stack traces for errors
-
-## Architecture
-
-```
-User Request
-    ↓
-Flask Router
-    ↓
-VylaScraper
-    ↓
-Upstream (koyso.com)
-    ↓
-JSON Response
+```javascript
+fetch('https://vyla-games.vercel.app/api/game/1927')
+  .then(res => res.json())
+  .then(game => {
+    console.log(game.title);
+    console.log(game.media.images);
+  });
 ```
 
-**File Structure**
-
-* `app.py` – Flask application and scraper logic
-* `templates/index.html` – Zero-UI interface
-* `static/` – Assets
-
-## Deployment
-
-Use a WSGI server:
+### cURL
 
 ```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+curl https://vyla-games.vercel.app/api/search?q=horror&page=1
 ```
 
-Or deploy via Vercel/Railway/Render.
+</details>
+
+---
+
+## Contributing
+
+<details>
+<summary>Click to expand</summary>
+
+1. Fork the repository
+2. Create a feature branch
+3. Implement changes
+4. Test locally
+5. Submit a pull request
+
+</details>
+
+---
 
 ## Disclaimer
 
-* Educational use only.
-* Respect upstream `robots.txt` and terms.
-* Users responsible for copyright compliance and server load.
-* Author not liable for misuse.
+<details>
+<summary>Click to expand</summary>
+
+* For educational purposes only
+* Respect upstream site terms
+* Users are responsible for copyright compliance
+* No liability for misuse
+
+</details>
+
+---
 
 ## License
 
-See [LICENSE](LICENSE).
+<details>
+<summary>Click to expand</summary>
+
+MIT License – See LICENSE file
+
+</details>
+
+---
+
+## Acknowledgments
+
+<details>
+<summary>Click to expand</summary>
+
+* Data sourced from koyso.com
+* Built with Flask
+* Deployed on Vercel
+
+**Live Demo:** [https://vyla-games.vercel.app](https://vyla-games.vercel.app)
+**API Status:** Check `/api/health` endpoint
+
+</details>

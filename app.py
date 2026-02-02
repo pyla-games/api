@@ -97,26 +97,10 @@ class VylaScraper:
         if not url or not url.startswith('http'):
             return url
         
-        import urllib.parse
-        parsed = urllib.parse.urlparse(url)
-        
-        if media_type == 'download':
-            filename = parsed.path.split('/')[-1]
-            if parsed.query:
-                filename = f"{filename}?{parsed.query}"
-            clean_path = f'/download/{filename}'
-        else:
-            url_clean = url.replace('https://', '').replace('http://', '')
-            parts = url_clean.split('/')
-            if len(parts) >= 2:
-                filename = '/'.join(parts[-2:])
-            else:
-                filename = parts[-1] if parts else 'file'
-            clean_path = f'/{media_type}/{filename}'
-        
-        proxy_path = f'/proxy{clean_path}'
+        encoded_url = urllib.parse.quote(url, safe='')
+        proxy_path = f'/proxy/{media_type}/{encoded_url}'
         self.url_cache[proxy_path] = url
-        return clean_path
+        return proxy_path
 
     def _has_next_page(self, html_content, current_page):
         next_page_pattern = r'<a[^>]*href="[^"]*\?page={}"[^>]*>'.format(current_page + 1)
@@ -370,11 +354,25 @@ class VylaScraper:
 
 scraper = VylaScraper()
 
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Accept'
+    response.headers['Access-Control-Max-Age'] = '3600'
+    return response
+
+@app.route('/OPTIONS', methods=['OPTIONS'])
+@app.route('/<path:path>', methods=['OPTIONS'])
+def handle_options(path=''):
+    response = app.make_response('')
+    response.status_code = 204
+    return response
+
 def json_response(data, status_code=200):
     response = jsonify(data)
     response.status_code = status_code
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Content-Type'] = 'application/json'
+    response.headers['Content-Type'] = 'application/json; charset=utf-8'
     return response
 
 def rate_limit_check(f):
@@ -383,39 +381,46 @@ def rate_limit_check(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/proxy/<path:subpath>')
-def proxy_media(subpath):
-    proxy_path = f'/proxy/{subpath}'
-    if proxy_path not in scraper.url_cache:
-        return 'Not Found', 404
-    original_url = scraper.url_cache[proxy_path]
+@app.route('/proxy/<media_type>/<path:encoded_url>')
+def proxy_media(media_type, encoded_url):
     try:
+        original_url = urllib.parse.unquote(encoded_url)
+        debug_log(f"Proxying {media_type}: {original_url}")
+        
         req = urllib.request.Request(original_url)
         req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         req.add_header('Referer', 'https://koyso.com/')
-        with urllib.request.urlopen(req) as response:
+        req.add_header('Accept', '*/*')
+        
+        with urllib.request.urlopen(req, timeout=30) as response:
             content = response.read()
             content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            
             flask_response = app.make_response(content)
             flask_response.headers['Content-Type'] = content_type
             flask_response.headers['Cache-Control'] = 'public, max-age=31536000'
             flask_response.headers['Access-Control-Allow-Origin'] = '*'
+            
             return flask_response
+            
     except Exception as e:
         debug_log(f"Error proxying {original_url}: {str(e)}")
-        return 'Error fetching media', 500
+        return json_response({'error': 'Failed to fetch media', 'url': original_url}, 500)
 
 @app.route('/image/<path:image_path>')
 def serve_image(image_path):
-    return proxy_media(f'image/{image_path}')
+    encoded_url = urllib.parse.quote(f'image/{image_path}', safe='')
+    return proxy_media('image', encoded_url)
 
 @app.route('/video/<path:video_path>')
 def serve_video(video_path):
-    return proxy_media(f'video/{video_path}')
+    encoded_url = urllib.parse.quote(f'video/{video_path}', safe='')
+    return proxy_media('video', encoded_url)
 
 @app.route('/download/<path:download_path>')
 def serve_download(download_path):
-    return proxy_media(f'download/{download_path}')
+    encoded_url = urllib.parse.quote(f'download/{download_path}', safe='')
+    return proxy_media('download', encoded_url)
 
 @app.route('/api/health')
 def health_check():
@@ -473,9 +478,12 @@ def index():
     user_agent = request.headers.get('User-Agent', '').lower()
     debug_log(f"Accept header: {accept_header}")
     debug_log(f"User-Agent: {user_agent}")
+    
     is_browser = 'mozilla' in user_agent or 'chrome' in user_agent or 'safari' in user_agent
     wants_json = 'application/json' in accept_header
+    
     debug_log(f"is_browser: {is_browser}, wants_json: {wants_json}")
+    
     if wants_json or not is_browser:
         debug_log("Returning JSON response")
         genres_list = []
@@ -497,6 +505,7 @@ def index():
                 "download": "/game/{game_id}/download"
             }
         })
+    
     debug_log("Returning HTML template")
     return render_template('index.html')
 
@@ -505,23 +514,14 @@ def index():
 def search_path(query):
     debug_log("=== SEARCH ROUTE ===")
     debug_log(f"Query: {query}")
-    accept_header = request.headers.get('Accept', '')
-    user_agent = request.headers.get('User-Agent', '').lower()
-    debug_log(f"Accept header: {accept_header}")
-    debug_log(f"User-Agent: {user_agent}")
-    wants_json = 'application/json' in accept_header
-    debug_log(f"wants_json: {wants_json}")
     
-    if not wants_json:
-        debug_log("No JSON requested, returning HTML template")
-        return render_template('index.html')
-    
-    debug_log("JSON requested, fetching search results")
     page = int(request.args.get('page', 1))
     decoded_query = urllib.parse.unquote(query)
     debug_log(f"Decoded query: {decoded_query}, Page: {page}")
+    
     games, has_next = scraper.get_games(None, decoded_query, page)
     debug_log(f"Found {len(games)} games, has_next: {has_next}")
+    
     result = {
         'status': 'success',
         'search_query': decoded_query,
@@ -530,11 +530,13 @@ def search_path(query):
         'has_next': has_next,
         'games': games
     }
+    
     if page > 1:
         result['previous'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page-1}'
     if has_next:
         result['next'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page+1}'
     result['back'] = request.url_root
+    
     debug_log("Returning JSON response")
     return json_response(result)
 
@@ -544,8 +546,11 @@ def get_games():
     genre_id = request.args.get('genre', '1')
     search = request.args.get('search', '')
     page = int(request.args.get('page', 1))
+    
     games, has_next = scraper.get_games(genre_id, search, page)
+    
     genre_name = scraper.genres.get(genre_id, ('Unknown', ''))[0] if not search else None
+    
     result = {
         'status': 'success',
         'total_results': len(games),
@@ -553,22 +558,27 @@ def get_games():
         'has_next': has_next,
         'games': games
     }
+    
     if genre_name:
         result['genre'] = genre_name
         result['genre_id'] = genre_id
     if search:
         result['search_query'] = search
+    
     if page > 1:
         prev_url = f'/api/games?genre={genre_id}&page={page-1}'
         if search:
             prev_url = f'/api/games?search={urllib.parse.quote(search)}&page={page-1}'
         result['previous'] = prev_url
+    
     if has_next:
         next_url = f'/api/games?genre={genre_id}&page={page+1}'
         if search:
             next_url = f'/api/games?search={urllib.parse.quote(search)}&page={page+1}'
         result['next'] = next_url
+    
     result['back'] = request.url_root
+    
     return json_response(result)
 
 @app.route('/api/game/<game_id>')
@@ -577,8 +587,10 @@ def get_game(game_id):
     debug_log(f"=== API GAME ROUTE: {game_id} ===")
     game_url = f"https://koyso.com/game/{game_id}"
     details = scraper.get_game_details(game_url)
+    
     if details:
         return json_response(details)
+    
     debug_log("Game not found")
     return json_response({'error': 'Game not found', 'back': request.url_root}, 404)
 
@@ -587,23 +599,14 @@ def get_game(game_id):
 def game_details_path(game_id):
     debug_log("=== GAME DETAILS ROUTE ===")
     debug_log(f"Game ID: {game_id}")
-    accept_header = request.headers.get('Accept', '')
-    user_agent = request.headers.get('User-Agent', '').lower()
-    debug_log(f"Accept header: {accept_header}")
-    debug_log(f"User-Agent: {user_agent}")
-    wants_json = 'application/json' in accept_header
-    debug_log(f"wants_json: {wants_json}")
     
-    if not wants_json:
-        debug_log("No JSON requested, returning HTML template")
-        return render_template('index.html')
-    
-    debug_log("JSON requested, fetching game details")
     game_url = f"https://koyso.com/game/{game_id}"
     details = scraper.get_game_details(game_url)
+    
     if details:
         debug_log("Game details found, returning JSON")
         return json_response(details)
+    
     debug_log("Game not found")
     return json_response({'error': 'Game not found', 'back': request.url_root}, 404)
 
@@ -616,49 +619,48 @@ def get_download_url_unified(game_id):
     debug_log(f"Download result type: {type(result)}")
     debug_log(f"Download result: {result}")
     
-    response_data = {}
-    
     if result is None:
         debug_log("ERROR: Result is None")
-        response_data = {'error': 'Failed to get download URL', 'back': request.url_root}
-        return json_response(response_data, 500)
+        return json_response({'error': 'Failed to get download URL', 'back': request.url_root}, 500)
     
     if isinstance(result, dict):
         debug_log(f"Result status: {result.get('status')}")
+        
         if result.get("status") == "cooldown":
             debug_log(f"Cooldown: {result.get('wait')} seconds")
-            response_data = {'error': 'cooldown', 'wait_seconds': result.get('wait', scraper.download_cooldown), 'back': request.url_root}
-            return json_response(response_data, 429)
+            return json_response({
+                'error': 'cooldown',
+                'wait_seconds': result.get('wait', scraper.download_cooldown),
+                'back': request.url_root
+            }, 429)
+        
         elif result.get("status") == "rate_limited":
             debug_log("Rate limited by upstream")
-            response_data = {'error': 'rate_limited', 'message': 'Too many requests', 'back': request.url_root}
-            return json_response(response_data, 429)
+            return json_response({
+                'error': 'rate_limited',
+                'message': 'Too many requests',
+                'back': request.url_root
+            }, 429)
+        
         elif result.get("status") == "success":
             original_url = result.get('url')
             debug_log(f"Original download URL: {original_url}")
-            response_data = {'status': 'success', 'download_url': original_url, 'back': request.url_root}
-            return json_response(response_data)
+            return json_response({
+                'status': 'success',
+                'download_url': original_url,
+                'back': request.url_root
+            })
+        
         elif result.get("status") == "error":
             error_msg = result.get('message', 'Unknown error')
             debug_log(f"ERROR: {error_msg}")
-            response_data = {'error': error_msg, 'back': request.url_root}
-            return json_response(response_data, 500)
+            return json_response({
+                'error': error_msg,
+                'back': request.url_root
+            }, 500)
     
     debug_log("ERROR: Unexpected result format")
-    response_data = {'error': 'Failed to get download URL', 'back': request.url_root}
-    return json_response(response_data, 500)
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def catch_all(path):
-    debug_log(f"=== CATCH ALL ROUTE: {path} ===")
-    if path.startswith('api/'):
-        return json_response({'error': 'Endpoint not found'}, 404)
-    game_match = re.match(r'game/(\d+)$', path)
-    if game_match:
-        return game_details_path(game_match.group(1))
-    debug_log("No match, returning HTML template")
-    return render_template('index.html')
+    return json_response({'error': 'Failed to get download URL', 'back': request.url_root}, 500)
 
 if __name__ == '__main__':
     app.run(debug=True)

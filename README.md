@@ -2,60 +2,26 @@
 
 # Vyla Games API
 
-A modern Flask-based game discovery and download API. Scrapes game data from koyso.com and provides a responsive web interface with full JSON API support.
-
----
-
-## Table of Contents
-
-* [Features](#features)
-* [Quick Start](#quick-start)
-* [Web Interface](#web-interface)
-* [API Documentation](#api-documentation)
-* [Available Genres](#available-genres)
-* [Configuration](#configuration)
-* [Architecture](#architecture)
-* [Frontend Customization](#frontend-customization)
-* [Debugging](#debugging)
-* [Deployment Options](#deployment-options)
-* [CORS & Security](#cors--security)
-* [Error Handling](#error-handling)
-* [Example Usage](#example-usage)
-* [Contributing](#contributing)
-* [Disclaimer](#disclaimer)
-* [License](#license)
-* [Acknowledgments](#acknowledgments)
-
----
+A modern Flask-based game discovery and download API. Scrapes game data from koyso.com and serves it through a responsive web interface with full JSON API support.
 
 ## Features
 
-<details>
-<summary>Click to expand</summary>
-
-* Responsive web interface with modern design
-* Complete RESTful JSON API
-* Stateless architecture for serverless deployment
-* Full CORS support
-* No rate limits on downloads
-* Media proxy for images and videos
-* 16 game categories including Action, RPG, Horror, and more
-* Full-text search with pagination
-* Rich metadata including screenshots, videos, descriptions, and recommendations
-* Mobile responsive
-
-</details>
-
----
+* **Modern Web Interface** – Responsive design with smooth layout and animations
+* **Complete JSON API** – RESTful endpoints for all game data
+* **Stateless Architecture** – Base64 URL encoding for serverless deployment
+* **CORS Enabled** – Use the API from any frontend
+* **No Rate Limits** – Instant downloads without cooldowns
+* **Media Proxying** – All images and videos served through the API
+* **16 Game Categories** – Action, Adventure, RPG, Horror, and more
+* **Full-Text Search** – Find games by keyword with pagination
+* **Rich Metadata** – Screenshots, videos, descriptions, recommendations
+* **Mobile-Responsive** – Works on all devices
 
 ## Quick Start
 
-<details>
-<summary>Click to expand</summary>
-
 ### Requirements
 
-* Python 3.9+
+* Python 3.9 or higher
 * Flask
 
 ### Installation
@@ -102,31 +68,19 @@ npm i -g vercel
 vercel --prod
 ```
 
-</details>
-
----
-
 ## Web Interface
 
-<details>
-<summary>Click to expand</summary>
+Access the web interface at `/` for:
 
 * Browse games by genre
 * Search games by name
-* Grid layout with cards
-* Game details modal (screenshots, videos, description)
+* Game cards in a grid layout
+* Game details modal with screenshots, videos, and descriptions
 * One-click downloads
-* Recommendations
-* Pagination
-
-</details>
-
----
+* Recommendations for similar games
+* Pagination for easy navigation
 
 ## API Documentation
-
-<details>
-<summary>Click to expand</summary>
 
 ### Base URL
 
@@ -137,8 +91,7 @@ Local: http://127.0.0.1:5000
 
 ### Endpoints
 
-<details>
-<summary>Health Check</summary>
+#### Health Check
 
 ```http
 GET /api/health
@@ -154,10 +107,7 @@ GET /api/health
 }
 ```
 
-</details>
-
-<details>
-<summary>List Genres</summary>
+#### List Genres
 
 ```http
 GET /api/genres
@@ -175,10 +125,7 @@ GET /api/genres
 }
 ```
 
-</details>
-
-<details>
-<summary>Browse Games</summary>
+#### Browse Games
 
 ```http
 GET /api/games?genre={id}&page={n}
@@ -186,8 +133,8 @@ GET /api/games?genre={id}&page={n}
 
 **Parameters:**
 
-* `genre` – Genre ID (1-16, default 1)
-* `page` – Page number (default 1)
+* `genre` – Genre ID (1-16, default: 1)
+* `page` – Page number (default: 1)
 
 **Response:**
 
@@ -207,10 +154,7 @@ GET /api/games?genre={id}&page={n}
 }
 ```
 
-</details>
-
-<details>
-<summary>Search Games</summary>
+#### Search Games
 
 ```http
 GET /api/search?q={query}&page={n}
@@ -219,7 +163,7 @@ GET /api/search?q={query}&page={n}
 **Parameters:**
 
 * `q` – Search query (required)
-* `page` – Page number (default 1)
+* `page` – Page number (default: 1)
 
 **Response:**
 
@@ -236,10 +180,7 @@ GET /api/search?q={query}&page={n}
 }
 ```
 
-</details>
-
-<details>
-<summary>Game Details</summary>
+#### Game Details
 
 ```http
 GET /api/game/{game_id}
@@ -263,10 +204,7 @@ GET /api/game/{game_id}
 }
 ```
 
-</details>
-
-<details>
-<summary>Get Download Link</summary>
+#### Get Download Link
 
 ```http
 GET /api/download/{game_id}
@@ -289,10 +227,7 @@ GET /api/download/{game_id}
 }
 ```
 
-</details>
-
-<details>
-<summary>Proxied Media</summary>
+#### Proxied Media
 
 ```http
 GET /proxy/{base64_url}
@@ -300,18 +235,9 @@ GET /proxy/{base64_url}
 
 * Decodes base64 URL
 * Fetches media from upstream
-* Returns content with proper headers and caching
-
-</details>
-
-</details>
-
----
+* Returns it with proper headers and caching
 
 ## Available Genres
-
-<details>
-<summary>Click to expand</summary>
 
 | ID | Genre Name          |
 | -- | ------------------- |
@@ -332,14 +258,7 @@ GET /proxy/{base64_url}
 | 15 | Indie Games         |
 | 16 | LAN connection      |
 
-</details>
-
----
-
 ## Configuration
-
-<details>
-<summary>Click to expand</summary>
 
 Key settings in `VylaScraper`:
 
@@ -349,16 +268,14 @@ self.request_delay = 0.05
 self.secret_key = "f6i6@m29r3fwi^yqd"
 ```
 
-</details>
-
----
-
 ## Architecture
 
-<details>
-<summary>Click to expand</summary>
+**Stateless Design:** Base64 URL encoding allows serverless deployment:
 
-**Stateless Design:** Base64 URL encoding allows serverless deployment.
+```
+Original URL: https://koyso.com/image.jpg
+Encoded: /proxy/aHR0cHM6Ly9rb3lzby5jb20vaW1hZ2UuanBn
+```
 
 **Workflow:**
 
@@ -370,14 +287,7 @@ self.secret_key = "f6i6@m29r3fwi^yqd"
 
 **Download Authentication:** SHA-256 signed requests to get final download links.
 
-</details>
-
----
-
 ## Frontend Customization
-
-<details>
-<summary>Click to expand</summary>
 
 Edit `index.html` to modify:
 
@@ -386,14 +296,7 @@ Edit `index.html` to modify:
 * Grid layout
 * Card styling
 
-</details>
-
----
-
 ## Debugging
-
-<details>
-<summary>Click to expand</summary>
 
 Enable debug logs:
 
@@ -403,14 +306,7 @@ DEBUG = True
 
 Logs include all HTTP requests, scraping results, proxy activity, and download authentication.
 
-</details>
-
----
-
 ## Deployment Options
-
-<details>
-<summary>Click to expand</summary>
 
 * Vercel: `vercel --prod`
 * Railway: `railway up`
@@ -432,28 +328,14 @@ pip install gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 app_final:app
 ```
 
-</details>
-
----
-
 ## CORS & Security
-
-<details>
-<summary>Click to expand</summary>
 
 * Full CORS support
 * JSON content-type headers
 * OPTIONS preflight handling
 * Public API, no authentication required
 
-</details>
-
----
-
 ## Error Handling
-
-<details>
-<summary>Click to expand</summary>
 
 All errors return JSON:
 
@@ -463,14 +345,7 @@ All errors return JSON:
 
 HTTP Status Codes: 200 (Success), 400 (Bad request), 404 (Not found), 500 (Server error)
 
-</details>
-
----
-
 ## Example Usage
-
-<details>
-<summary>Click to expand</summary>
 
 ### Python
 
@@ -501,14 +376,7 @@ fetch('https://vyla-games.vercel.app/api/game/1927')
 curl https://vyla-games.vercel.app/api/search?q=horror&page=1
 ```
 
-</details>
-
----
-
 ## Contributing
-
-<details>
-<summary>Click to expand</summary>
 
 1. Fork the repository
 2. Create a feature branch
@@ -516,39 +384,18 @@ curl https://vyla-games.vercel.app/api/search?q=horror&page=1
 4. Test locally
 5. Submit a pull request
 
-</details>
-
----
-
 ## Disclaimer
-
-<details>
-<summary>Click to expand</summary>
 
 * For educational purposes only
 * Respect upstream site terms
 * Users are responsible for copyright compliance
 * No liability for misuse
 
-</details>
-
----
-
 ## License
-
-<details>
-<summary>Click to expand</summary>
 
 MIT License – See LICENSE file
 
-</details>
-
----
-
 ## Acknowledgments
-
-<details>
-<summary>Click to expand</summary>
 
 * Data sourced from koyso.com
 * Built with Flask
@@ -556,5 +403,3 @@ MIT License – See LICENSE file
 
 **Live Demo:** [https://vyla-games.vercel.app](https://vyla-games.vercel.app)
 **API Status:** Check `/api/health` endpoint
-
-</details>

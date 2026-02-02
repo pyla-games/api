@@ -29,93 +29,148 @@
     <meta name="twitter:description" content="JSON API for game discovery and downloads">
     <meta name="twitter:image" content="/static/images/background.png">
 </head>
-<style>
-    html,
-    body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow-x: hidden;
-        background: transparent;
-        font-family: monospace
-    }
-
-    body {
-        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)
-    }
-
-    pre {
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        margin: 0;
-        padding: 20px;
-        font-size: 14px;
-        line-height: 1.6
-    }
-
-    a {
-        color: #0066cc;
-        text-decoration: none
-    }
-
-    a:hover {
-        text-decoration: underline
-    }
-
-    @media(prefers-color-scheme:dark) {
-        a {
-            color: #4d9fff
-        }
-    }
-
-    @media(display-mode:standalone) {
-        body {
-            background: transparent
-        }
-    }
-</style>
 <script>
     let state = { page: 1, genre: '1', search: '', hasNext: false };
+    const DEBUG = true;
+    function log(...args) { if (DEBUG) console.log('[VYLA]', ...args); }
     function enc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML }
     function nav(u, push = true) {
-        if (u.startsWith('http')) { window.open(u, '_blank'); return }
-        fetch(u).then(r => r.json()).then(d => {
-            render(d);
-            if (push) window.history.pushState({ url: u }, '', u);
-        }).catch(e => render({ error: 'Failed to load', message: e.message }))
+        log('nav() called with:', u, 'push:', push);
+        if (u.startsWith('http')) {
+            const url = new URL(u);
+            const path = url.pathname;
+            log('Full URL detected, extracting path:', path);
+            const headers = { 'Accept': 'application/json' };
+            log('Fetching with headers:', headers);
+            fetch(path, { headers }).then(r => {
+                log('Response status:', r.status, 'Content-Type:', r.headers.get('Content-Type'));
+                return r.json();
+            }).then(d => {
+                log('JSON parsed successfully:', d);
+                render(d);
+                if (push) window.history.pushState({ url: path }, '', path);
+            }).catch(e => {
+                log('ERROR in fetch:', e);
+                render({ error: 'Failed to load', message: e.message });
+            })
+            return;
+        }
+        const headers = { 'Accept': 'application/json' };
+        log('Fetching:', u, 'with headers:', headers);
+        fetch(u, { headers }).then(r => {
+            log('Response status:', r.status, 'Content-Type:', r.headers.get('Content-Type'));
+            if (!r.ok) {
+                log('Response not OK, status:', r.status);
+            }
+            return r.text();
+        }).then(text => {
+            log('Response text length:', text.length, 'First 200 chars:', text.substring(0, 200));
+            try {
+                const d = JSON.parse(text);
+                log('JSON parsed successfully');
+                render(d);
+                if (push) window.history.pushState({ url: u }, '', u);
+            } catch (e) {
+                log('JSON parse error:', e);
+                log('Full response text:', text);
+                render({ error: 'Failed to parse JSON', message: e.message, response_preview: text.substring(0, 500) });
+            }
+        }).catch(e => {
+            log('ERROR in fetch:', e);
+            render({ error: 'Failed to load', message: e.message });
+        })
     }
     function render(d) {
+        log('render() called with data:', d);
         const o = document.getElementById('output');
         const j = JSON.stringify(d, null, 2);
-        const linked = j.split('\n').map(line => {
-            return line.replace(/"(\/[^"]+)"/g, (m, p) => {
-                if (p.match(/^\/(api\/|search\/|\?|game\/|image\/|video\/|download\/)/)) return `"<a href="${p}">${p}</a>"`;
-                return m;
-            }).replace(/"(https?:\/\/[^"]+)"/g, (m, u) => `"<a href="${u}" target="_blank">${u}</a>"`);
-        }).join('\n');
+        log('JSON stringified, length:', j.length);
+        const linked = j.replace(/"(\/[^"]+)"/g, (m, p) => {
+            if (p.match(/^\/(api\/|search\/|\?|game\/|image\/|video\/|download\/)/)) return `"<a href="${p}">${p}</a>"`;
+            return m;
+        }).replace(/"(https?:\/\/[^"]+)"/g, (m, u) => {
+            try {
+                const url = new URL(u);
+                if (url.hostname === window.location.hostname && url.pathname === '/') {
+                    return `"<a href="${u}">${u}</a>"`;
+                }
+            } catch (e) {
+            }
+            return `"<a href="${u}" target="_blank">${u}</a>"`;
+        });
+        log('Links processed, setting innerHTML');
         o.innerHTML = linked;
         if (d.page) state.page = d.page;
         if (d.has_next !== undefined) state.hasNext = d.has_next;
+        log('Calling attachLinks()');
         attachLinks();
+        log('render() complete');
     }
     function attachLinks() {
-        document.querySelectorAll('a').forEach(a => {
+        log('attachLinks() called');
+        const links = document.querySelectorAll('#output a');
+        log('Found', links.length, 'links');
+        links.forEach(a => {
             const h = a.getAttribute('href');
             if (!h || h.startsWith('http')) return;
             a.onclick = e => {
                 e.preventDefault();
-                if (h.startsWith('/image/') || h.startsWith('/video/') || h.startsWith('/download/')) { window.open(h, '_blank'); return }
-                if (h.startsWith('/?')) parseQuery(h);
-                else if (h.startsWith('/api/game/')) nav(h);
-                else if (h.startsWith('/api/games')) nav(h);
-                else if (h.startsWith('/game/') && h.includes('/download')) nav(h);
-                else if (h.startsWith('/search/')) nav(h);
-                else if (h === '/') { nav('/api/genres'); state = { page: 1, genre: '1', search: '', hasNext: false } }
-                else nav(h);
+                log('Link clicked:', h);
+                if (h.startsWith('/image/') || h.startsWith('/video/')) {
+                    log('Opening media in new tab');
+                    window.open(h, '_blank');
+                    return;
+                }
+                if (h.startsWith('/download/')) {
+                    log('Opening download in new tab');
+                    window.open(h, '_blank');
+                    return;
+                }
+                if (h.startsWith('/?')) {
+                    log('Query string link, calling parseQuery');
+                    parseQuery(h);
+                }
+                else if (h.startsWith('/api/game/')) {
+                    log('API game link');
+                    nav(h);
+                }
+                else if (h.startsWith('/api/games')) {
+                    log('API games link');
+                    nav(h);
+                }
+                else if (h.startsWith('/api/download/')) {
+                    log('API download link');
+                    nav(h);
+                }
+                else if (h.startsWith('/game/') && h.includes('/download')) {
+                    log('Game download link');
+                    nav(h);
+                }
+                else if (h.startsWith('/search/')) {
+                    log('Search link');
+                    nav(h);
+                }
+                else if (h.startsWith('http')) {
+                    const url = new URL(h);
+                    if (url.hostname === window.location.hostname && url.pathname === '/') {
+                        log('Back button link');
+                        nav(h);
+                        return;
+                    }
+                    log('External link, opening in new tab');
+                    window.open(h, '_blank');
+                    return;
+                }
+                else {
+                    log('Default nav');
+                    nav(h);
+                }
             }
         });
+        log('attachLinks() complete');
     }
     function parseQuery(p) {
+        log('parseQuery() called with:', p);
         const u = new URLSearchParams(p.split('?')[1]);
         const g = u.get('genre') || '1';
         const pg = u.get('page') || '1';
@@ -123,11 +178,15 @@
         state.genre = g; state.page = parseInt(pg); state.search = s;
         let api = `/api/games?genre=${g}&page=${pg}`;
         if (s) api = `/api/games?search=${encodeURIComponent(s)}&page=${pg}`;
+        log('Constructed API URL:', api);
         nav(api);
     }
     function init() {
+        log('=== init() called ===');
         const p = new URLSearchParams(window.location.search);
         const path = window.location.pathname;
+        log('Current path:', path);
+        log('Query params:', p.toString());
         const g = p.get('genre');
         const s = p.get('search');
         const pg = p.get('page');
@@ -136,16 +195,56 @@
         const sr = path.match(/^\/search\/(.+)$/);
         const api_game = path.match(/^\/api\/game\/(\d+)$/);
         const api_games = path.match(/^\/api\/games$/);
-        if (api_game) { nav(`/api/game/${api_game[1]}`, false) }
-        else if (api_games) { const qu = window.location.search; nav(`/api/games${qu}`, false) }
-        else if (gm) { nav(`/api/game/${gm[1]}`, false) }
-        else if (dl) { nav(`/game/${dl[1]}/download`, false) }
-        else if (sr) { const q = decodeURIComponent(sr[1]); nav(`/search/${q}?page=${pg || 1}`, false) }
-        else if (g || s || pg) { parseQuery(window.location.search) }
-        else { nav('/api/genres', false) }
+
+        log('Pattern matches:', { api_game, api_games, gm, dl, sr });
+
+        if (api_game) {
+            log('Matched api_game pattern');
+            nav(`/api/game/${api_game[1]}`, false);
+        }
+        else if (api_games) {
+            log('Matched api_games pattern');
+            const qu = window.location.search;
+            nav(`/api/games${qu}`, false);
+        }
+        else if (gm) {
+            log('Matched game pattern');
+            nav(`/api/game/${gm[1]}`, false);
+        }
+        else if (dl) {
+            log('Matched download pattern');
+            nav(`/game/${dl[1]}/download`, false);
+        }
+        else if (sr) {
+            log('Matched search pattern, query:', sr[1]);
+            const q = decodeURIComponent(sr[1]);
+            const targetUrl = `/search/${q}?page=${pg || 1}`;
+            log('Will navigate to:', targetUrl);
+            nav(targetUrl, false);
+        }
+        else if (g || s || pg) {
+            log('Has query params');
+            parseQuery(window.location.search);
+        }
+        else if (path === '/') {
+            log('Root path');
+            nav('/', false);
+        }
+        else {
+            log('Fallback to genres');
+            nav('/api/genres', false);
+        }
+        log('=== init() complete ===');
     }
-    window.onpopstate = e => { if (e.state && e.state.url) nav(e.state.url, false); else init() };
-    window.onload = init;
+    window.onpopstate = e => {
+        log('onpopstate event:', e.state);
+        if (e.state && e.state.url) nav(e.state.url, false);
+        else init();
+    };
+    window.onload = () => {
+        log('=== window.onload fired ===');
+        init();
+    };
 </script>
 </head>
 

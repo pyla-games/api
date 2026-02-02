@@ -13,6 +13,12 @@ import http.cookiejar
 
 app = Flask(__name__)
 
+DEBUG = True
+
+def debug_log(msg, *args):
+    if DEBUG:
+        print(f"[VYLA-BACKEND] {msg}", *args)
+
 class VylaScraper:
     def __init__(self):
         self.base_url = "https://koyso.com"
@@ -62,16 +68,18 @@ class VylaScraper:
                     continue
             return content.decode('utf-8', errors='replace')
         except urllib.error.HTTPError as e:
+            debug_log(f"HTTPError fetching {url}: {e.code}")
             return ""
         except Exception as e:
-            print(f"Error fetching page {url}: {str(e)}")
+            debug_log(f"Error fetching page {url}: {str(e)}")
             return ""
 
     def _extract_games_from_page(self, html_content):
         games = []
         game_item_pattern = r'<a class="game_item"[^>]*href="([^"]*)"[^>]*>.*?<img[^>]*(?:data-src|src)="([^"]*)"[^>]*>.*?<span[^>]*>([^<]*)</span>'
         game_item_matches = re.findall(game_item_pattern, html_content, re.DOTALL)
-        for game_url, image_url, game_title in game_item_matches:
+        debug_log(f"_extract_games_from_page: Found {len(game_item_matches)} game items")
+        for idx, (game_url, image_url, game_title) in enumerate(game_item_matches):
             game_id = game_url.strip().split('/')[-1]
             proxied_image = self._proxy_url(image_url, 'image')
             game = {
@@ -80,6 +88,8 @@ class VylaScraper:
                 'image_url': proxied_image,
                 'view': f'/api/game/{game_id}'
             }
+            if idx < 3:
+                debug_log(f"  Game {idx}: ID={game_id}, URL={game_url}, Title={game_title.strip()[:50]}")
             games.append(game)
         return games
 
@@ -121,6 +131,7 @@ class VylaScraper:
         return False
 
     def get_games(self, genre_id=None, search_query=None, page=1):
+        debug_log(f"get_games called: genre_id={genre_id}, search_query={search_query}, page={page}")
         games = []
         if search_query:
             encoded_query = urllib.parse.quote(search_query)
@@ -139,6 +150,7 @@ class VylaScraper:
                 url = f"{self.base_url}/"
             else:
                 url = f"{self.base_url}/?page={page}"
+        debug_log(f"Fetching URL: {url}")
         html_content = self.fetch_page(url)
         if html_content:
             games = self._extract_games_from_page(html_content)
@@ -148,13 +160,19 @@ class VylaScraper:
         return games, has_next
 
     def get_game_details(self, game_url):
+        debug_log(f"=== get_game_details called for: {game_url} ===")
         html_content = self.fetch_page(game_url)
         if not html_content:
+            debug_log("Failed to fetch HTML content")
             return None
+        
         details = {}
+        
         title_match = re.search(r'<h1 class="content_title"[^>]*>(.*?)</h1>', html_content, re.DOTALL)
         if title_match:
             details['title'] = html.unescape(re.sub(r'<[^>]*>', '', title_match.group(1)).strip())
+            debug_log(f"Title: {details['title']}")
+        
         content_body_match = re.search(r'<div class="content_body">(.*?)</div>', html_content, re.DOTALL)
         if content_body_match:
             content_html = content_body_match.group(1)
@@ -166,12 +184,15 @@ class VylaScraper:
                 if p:
                     clean_paragraphs.append(p)
             details['full_description'] = html.unescape('|||'.join(clean_paragraphs))
+            debug_log(f"Description length: {len(details['full_description'])}")
+            
             all_media = re.findall(r'https?://[^\s"\']+\.(?:jpg|png|gif|webp|avif|jpeg|mp4|webm)', html_content, re.IGNORECASE)
             img_pattern = r'<img[^>]*src="([^"]+\.(?:jpg|png|gif|webp|avif|jpeg))"'
             img_matches = re.findall(img_pattern, html_content, re.IGNORECASE)
             picture_source_pattern = r'<source[^>]*srcset="([^"]+\.(?:webp|avif|jpg|png|gif|jpeg))"'
             picture_matches = re.findall(picture_source_pattern, html_content, re.IGNORECASE)
             all_media_urls = list(set(img_matches + picture_matches + all_media))
+            
             video_webm = re.findall(r'https?://[^\s"\']+\.webm', html_content, re.IGNORECASE)
             video_mp4 = re.findall(r'https?://[^\s"\']+\.mp4', html_content, re.IGNORECASE)
             video_urls = video_webm + video_mp4
@@ -186,6 +207,7 @@ class VylaScraper:
                     elif video.endswith('.mp4'):
                         if basename + '.webm' not in video_basenames:
                             unique_videos.append(video)
+            
             unique_images = []
             image_basenames = set()
             image_preference = ['.webp', '.avif', '.png', '.jpg', '.jpeg', '.gif']
@@ -203,27 +225,60 @@ class VylaScraper:
                                     selected = other_img
                                     break
                     unique_images.append(selected)
+            
             proxied_images = [self._proxy_url(img, 'image') for img in unique_images[:30]]
             proxied_videos = [self._proxy_url(vid, 'video') for vid in unique_videos[:10]]
             details['media'] = {
                 'images': proxied_images,
                 'videos': proxied_videos
             }
+            debug_log(f"Found {len(proxied_images)} images and {len(proxied_videos)} videos")
+        
+        size_match = re.search(r'<li>\s*<span>Size</span>\s*<span>([^<]+)</span>', html_content, re.DOTALL)
+        if size_match:
+            details['size'] = size_match.group(1).strip()
+            debug_log(f"Size: {details['size']}")
+        
+        version_match = re.search(r'<li>\s*<span>Version</span>\s*<span[^>]*>([^<]+)</span>', html_content, re.DOTALL)
+        if version_match:
+            details['version'] = version_match.group(1).strip()
+            debug_log(f"Version: {details['version']}")
+        
+        recommendations = []
+        rec_pattern = r'<a class="recommendations_item" href="https://koyso\.com/game/(\d+)"[^>]*title="([^"]*)"'
+        rec_matches = re.findall(rec_pattern, html_content)
+        debug_log(f"Found {len(rec_matches)} recommendations")
+        for rec_id, rec_title in rec_matches:
+            rec_img_pattern = f'<a class="recommendations_item" href="https://koyso\\.com/game/{rec_id}".*?<img[^>]*src="([^"]+)"'
+            rec_img_match = re.search(rec_img_pattern, html_content, re.DOTALL)
+            rec_image = self._proxy_url(rec_img_match.group(1), 'image') if rec_img_match else None
+            recommendations.append({
+                'id': rec_id,
+                'title': html.unescape(rec_title),
+                'image_url': rec_image,
+                'view': f'/api/game/{rec_id}'
+            })
+        if recommendations:
+            details['recommendations'] = recommendations
+            debug_log(f"Recommendations: {[r['title'] for r in recommendations]}")
+        
         game_id = game_url.split('/')[-1]
         details['id'] = game_id
         details['download_url'] = f"/api/download/{game_id}"
-        details['back'] = "/"
+        details['back'] = f"{request.url_root}"
+        
+        debug_log(f"=== get_game_details complete for game {game_id} ===")
         return details
 
     def get_final_download_url(self, game_id):
-        print(f"\n>>> get_final_download_url called for game_id: {game_id}")
+        debug_log(f"\n=== get_final_download_url called for game_id: {game_id} ===")
         current_time = time.time()
         
         if game_id in self.last_download_request:
             time_since_last = current_time - self.last_download_request[game_id]
             if time_since_last < self.download_cooldown:
                 wait_time = int(self.download_cooldown - time_since_last) + 1
-                print(f">>> Cooldown active, wait: {wait_time}s")
+                debug_log(f"Cooldown active, wait: {wait_time}s")
                 return {"status": "cooldown", "wait": wait_time}
         
         self.last_download_request[game_id] = current_time
@@ -233,12 +288,12 @@ class VylaScraper:
             hash_input = timestamp + game_id + self.secret_key
             sign = hashlib.sha256(hash_input.encode()).hexdigest()
             
-            print(f">>> Timestamp: {timestamp}")
-            print(f">>> Hash input: {hash_input}")
-            print(f">>> SHA256 Sign: {sign}")
+            debug_log(f"Timestamp: {timestamp}")
+            debug_log(f"Hash input: {hash_input}")
+            debug_log(f"SHA256 Sign: {sign}")
             
             download_api_url = f"{self.base_url}/api/getGamesDownloadUrl"
-            print(f">>> Target URL: {download_api_url}")
+            debug_log(f"Target URL: {download_api_url}")
             
             post_data = {
                 'id': game_id,
@@ -246,7 +301,7 @@ class VylaScraper:
                 'secretKey': sign,
                 'canvasId': '0'
             }
-            print(f">>> POST data: {post_data}")
+            debug_log(f"POST data: {post_data}")
             
             encoded_data = urllib.parse.urlencode(post_data).encode('utf-8')
             req = urllib.request.Request(download_api_url, data=encoded_data, method='POST')
@@ -256,32 +311,32 @@ class VylaScraper:
             req.add_header('Referer', f'{self.base_url}/download/{game_id}')
             req.add_header('Cookie', 'site_auth=1; key=NBQEah#h@6qHr7T!k')
             
-            print(f">>> Sending request...")
+            debug_log("Sending request...")
             response = urllib.request.urlopen(req, timeout=30)
             response_data = response.read().decode('utf-8')
-            print(f">>> Response received: {response_data[:200]}")
+            debug_log(f"Response received: {response_data[:200]}")
             
             try:
                 json_response = json.loads(response_data)
-                print(f">>> Parsed JSON: {json_response}")
+                debug_log(f"Parsed JSON: {json_response}")
                 
                 if isinstance(json_response, str) and json_response.startswith('http'):
-                    print(f">>> Response is direct URL: {json_response}")
+                    debug_log(f"Response is direct URL: {json_response}")
                     return {"status": "success", "url": json_response}
                 elif 'url' in json_response:
-                    print(f">>> Found URL in response: {json_response['url']}")
+                    debug_log(f"Found URL in response: {json_response['url']}")
                     return {"status": "success", "url": json_response['url']}
                 elif 'data' in json_response and isinstance(json_response['data'], dict) and 'url' in json_response['data']:
-                    print(f">>> Found URL in data: {json_response['data']['url']}")
+                    debug_log(f"Found URL in data: {json_response['data']['url']}")
                     return {"status": "success", "url": json_response['data']['url']}
                 
-                print(f">>> No URL found in JSON response")
+                debug_log("No URL found in JSON response")
                 return {"status": "error", "message": "No download URL in API response"}
                 
             except json.JSONDecodeError as je:
-                print(f">>> JSON decode error: {je}")
+                debug_log(f"JSON decode error: {je}")
                 if response_data and response_data.startswith('http'):
-                    print(f">>> Response is plain URL: {response_data}")
+                    debug_log(f"Response is plain URL: {response_data}")
                     return {"status": "success", "url": response_data.strip()}
             
             return {"status": "error", "message": "Invalid API response format"}
@@ -295,151 +350,84 @@ class VylaScraper:
                         try:
                             error_body = raw_data.decode(encoding)
                             break
-                        except:
+                        except UnicodeDecodeError:
                             continue
-            except:
-                error_body = 'Could not decode error response'
+            except Exception:
+                pass
             
-            print(f">>> HTTP Error {e.code}")
-            print(f">>> Error body: {error_body[:500]}")
+            debug_log(f"HTTPError: {e.code} - {e.reason}")
+            debug_log(f"Error body: {error_body[:200]}")
             
             if e.code == 429:
-                try:
-                    rate_limit_data = json.loads(error_body)
-                    if 'downloadUrl' in rate_limit_data:
-                        print(f">>> Found download URL in 429 response: {rate_limit_data['downloadUrl']}")
-                        return {"status": "success", "url": rate_limit_data['downloadUrl']}
-                except:
-                    pass
-                self.last_download_request[game_id] = current_time + 300
-                return {"status": "rate_limited", "message": "Too many requests to upstream API"}
-            elif e.code == 403:
-                return {"status": "error", "message": "Access forbidden - check cookies or timestamp"}
-            elif e.code == 404:
-                return {"status": "error", "message": "Game download not available"}
-            
-            return {"status": "error", "message": f"Upstream API error: HTTP {e.code}"}
+                return {"status": "rate_limited", "message": "Too many requests"}
+            return {"status": "error", "message": f"HTTP {e.code}: {e.reason}"}
             
         except Exception as e:
-            print(f">>> Exception: {str(e)}")
+            debug_log(f"Exception: {str(e)}")
             import traceback
-            traceback.print_exc()
-            return {"status": "error", "message": f"Download service error: {str(e)}"}
+            debug_log(f"Traceback: {traceback.format_exc()}")
+            return {"status": "error", "message": str(e)}
 
 scraper = VylaScraper()
+
+def json_response(data, status_code=200):
+    response = jsonify(data)
+    response.status_code = status_code
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Content-Type'] = 'application/json'
+    return response
 
 def rate_limit_check(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'rate_limited' in request.cookies:
-            return json.dumps({'error': 'Rate limited'}), 429, {'Content-Type': 'application/json'}
         return f(*args, **kwargs)
     return decorated_function
 
-def json_response(data, status=200):
-    return json.dumps(data, ensure_ascii=False, indent=2), status, {'Content-Type': 'application/json; charset=utf-8'}
-
-@app.route('/download/<path:download_path>')
-@app.route('/proxy/download/<path:download_path>')
-def proxy_download(download_path):
+@app.route('/proxy/<path:subpath>')
+def proxy_media(subpath):
+    proxy_path = f'/proxy/{subpath}'
+    if proxy_path not in scraper.url_cache:
+        return 'Not Found', 404
+    original_url = scraper.url_cache[proxy_path]
     try:
-        query_string = request.query_string.decode('utf-8')
-        if query_string:
-            full_path = f'/proxy/download/{download_path}?{query_string}'
-        else:
-            full_path = f'/proxy/download/{download_path}'
-        
-        print(f">>> Proxy download request: {full_path}")
-        print(f">>> Cache keys available: {list(scraper.url_cache.keys())[:5]}")
-        
-        if full_path in scraper.url_cache:
-            url = scraper.url_cache[full_path]
-            print(f">>> Found in cache: {url}")
-        else:
-            print(f">>> Not in cache, trying without query...")
-            base_path = f'/proxy/download/{download_path}'
-            if base_path in scraper.url_cache:
-                url = scraper.url_cache[base_path]
-                if query_string:
-                    url = f"{url}?{query_string}"
-                print(f">>> Reconstructed URL: {url}")
-            else:
-                url = f"https://{download_path}"
-                if query_string:
-                    url = f"{url}?{query_string}"
-                print(f">>> Fallback URL: {url}")
-        
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(original_url)
         req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         req.add_header('Referer', 'https://koyso.com/')
-        response = urllib.request.urlopen(req, timeout=30)
-        file_data = response.read()
-        content_type = response.headers.get('Content-Type', 'application/octet-stream')
-        filename = download_path.split('/')[-1]
-        return file_data, 200, {
-            'Content-Type': content_type,
-            'Content-Disposition': f'attachment; filename="{filename}"',
-            'Cache-Control': 'public, max-age=3600'
-        }
+        with urllib.request.urlopen(req) as response:
+            content = response.read()
+            content_type = response.headers.get('Content-Type', 'application/octet-stream')
+            flask_response = app.make_response(content)
+            flask_response.headers['Content-Type'] = content_type
+            flask_response.headers['Cache-Control'] = 'public, max-age=31536000'
+            flask_response.headers['Access-Control-Allow-Origin'] = '*'
+            return flask_response
     except Exception as e:
-        print(f">>> Proxy download error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return json_response({'error': 'Failed to download file'}, 404)
+        debug_log(f"Error proxying {original_url}: {str(e)}")
+        return 'Error fetching media', 500
 
 @app.route('/image/<path:image_path>')
-@app.route('/proxy/image/<path:image_path>')
-def proxy_image(image_path):
-    try:
-        proxy_key = f'/proxy/image/{image_path}'
-        if proxy_key in scraper.url_cache:
-            url = scraper.url_cache[proxy_key]
-        else:
-            url = f"https://{image_path}"
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-        req.add_header('Referer', 'https://koyso.com/')
-        response = urllib.request.urlopen(req, timeout=30)
-        image_data = response.read()
-        content_type = response.headers.get('Content-Type', 'image/jpeg')
-        return image_data, 200, {'Content-Type': content_type, 'Cache-Control': 'public, max-age=86400'}
-    except Exception as e:
-        return json_response({'error': 'Failed to load image'}, 404)
+def serve_image(image_path):
+    return proxy_media(f'image/{image_path}')
 
 @app.route('/video/<path:video_path>')
-@app.route('/proxy/video/<path:video_path>')
-def proxy_video(video_path):
-    try:
-        proxy_key = f'/proxy/video/{video_path}'
-        if proxy_key in scraper.url_cache:
-            url = scraper.url_cache[proxy_key]
-        else:
-            url = f"https://{video_path}"
-        req = urllib.request.Request(url)
-        req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
-        req.add_header('Referer', 'https://koyso.com/')
-        response = urllib.request.urlopen(req, timeout=30)
-        video_data = response.read()
-        content_type = response.headers.get('Content-Type', 'video/mp4')
-        return video_data, 200, {'Content-Type': content_type, 'Cache-Control': 'public, max-age=86400'}
-    except Exception as e:
-        return json_response({'error': 'Failed to load video'}, 404)
+def serve_video(video_path):
+    return proxy_media(f'video/{video_path}')
+
+@app.route('/download/<path:download_path>')
+def serve_download(download_path):
+    return proxy_media(f'download/{download_path}')
 
 @app.route('/api/health')
 def health_check():
     try:
         test_games, _ = scraper.get_games('1', None, 1)
-        scraping_works = len(test_games) > 0
-        test_url = f"{scraper.base_url}/"
-        connectivity_works = bool(scraper.fetch_page(test_url))
         checks = {
-            "scraping": scraping_works,
-            "connectivity": connectivity_works,
+            "scraping": len(test_games) > 0,
+            "connectivity": True,
             "api_responsive": True
         }
-        overall_status = "success" if all(checks.values()) else "partial" if any(checks.values()) else "fail"
         return json_response({
-            "status": overall_status,
+            "status": "healthy" if all(checks.values()) else "degraded",
             "checks": checks,
             "timestamp": int(time.time())
         })
@@ -480,11 +468,16 @@ def get_genres():
 
 @app.route('/')
 def index():
+    debug_log("=== INDEX ROUTE ===")
     accept_header = request.headers.get('Accept', '')
     user_agent = request.headers.get('User-Agent', '').lower()
+    debug_log(f"Accept header: {accept_header}")
+    debug_log(f"User-Agent: {user_agent}")
     is_browser = 'mozilla' in user_agent or 'chrome' in user_agent or 'safari' in user_agent
     wants_json = 'application/json' in accept_header
+    debug_log(f"is_browser: {is_browser}, wants_json: {wants_json}")
     if wants_json or not is_browser:
+        debug_log("Returning JSON response")
         genres_list = []
         for genre_id, (genre_name, _) in scraper.genres.items():
             genres_list.append({
@@ -504,14 +497,31 @@ def index():
                 "download": "/game/{game_id}/download"
             }
         })
+    debug_log("Returning HTML template")
     return render_template('index.html')
 
 @app.route('/search/<path:query>')
 @rate_limit_check
 def search_path(query):
+    debug_log("=== SEARCH ROUTE ===")
+    debug_log(f"Query: {query}")
+    accept_header = request.headers.get('Accept', '')
+    user_agent = request.headers.get('User-Agent', '').lower()
+    debug_log(f"Accept header: {accept_header}")
+    debug_log(f"User-Agent: {user_agent}")
+    wants_json = 'application/json' in accept_header
+    debug_log(f"wants_json: {wants_json}")
+    
+    if not wants_json:
+        debug_log("No JSON requested, returning HTML template")
+        return render_template('index.html')
+    
+    debug_log("JSON requested, fetching search results")
     page = int(request.args.get('page', 1))
     decoded_query = urllib.parse.unquote(query)
+    debug_log(f"Decoded query: {decoded_query}, Page: {page}")
     games, has_next = scraper.get_games(None, decoded_query, page)
+    debug_log(f"Found {len(games)} games, has_next: {has_next}")
     result = {
         'status': 'success',
         'search_query': decoded_query,
@@ -524,7 +534,8 @@ def search_path(query):
         result['previous'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page-1}'
     if has_next:
         result['next'] = f'/search/{urllib.parse.quote(decoded_query)}?page={page+1}'
-    result['back'] = '/'
+    result['back'] = request.url_root
+    debug_log("Returning JSON response")
     return json_response(result)
 
 @app.route('/api/games')
@@ -557,68 +568,96 @@ def get_games():
         if search:
             next_url = f'/api/games?search={urllib.parse.quote(search)}&page={page+1}'
         result['next'] = next_url
-    result['back'] = '/'
+    result['back'] = request.url_root
     return json_response(result)
 
 @app.route('/api/game/<game_id>')
 @rate_limit_check
 def get_game(game_id):
+    debug_log(f"=== API GAME ROUTE: {game_id} ===")
     game_url = f"https://koyso.com/game/{game_id}"
     details = scraper.get_game_details(game_url)
     if details:
         return json_response(details)
-    return json_response({'error': 'Game not found'}, 404)
+    debug_log("Game not found")
+    return json_response({'error': 'Game not found', 'back': request.url_root}, 404)
 
 @app.route('/game/<game_id>')
 @rate_limit_check
 def game_details_path(game_id):
+    debug_log("=== GAME DETAILS ROUTE ===")
+    debug_log(f"Game ID: {game_id}")
+    accept_header = request.headers.get('Accept', '')
+    user_agent = request.headers.get('User-Agent', '').lower()
+    debug_log(f"Accept header: {accept_header}")
+    debug_log(f"User-Agent: {user_agent}")
+    wants_json = 'application/json' in accept_header
+    debug_log(f"wants_json: {wants_json}")
+    
+    if not wants_json:
+        debug_log("No JSON requested, returning HTML template")
+        return render_template('index.html')
+    
+    debug_log("JSON requested, fetching game details")
     game_url = f"https://koyso.com/game/{game_id}"
     details = scraper.get_game_details(game_url)
     if details:
+        debug_log("Game details found, returning JSON")
         return json_response(details)
-    return json_response({'error': 'Game not found'}, 404)
+    debug_log("Game not found")
+    return json_response({'error': 'Game not found', 'back': request.url_root}, 404)
 
 @app.route('/api/download/<game_id>')
 @app.route('/game/<game_id>/download')
 @rate_limit_check
 def get_download_url_unified(game_id):
-    print(f"\n=== DOWNLOAD REQUEST for game_id: {game_id} ===")
+    debug_log(f"\n=== DOWNLOAD REQUEST for game_id: {game_id} ===")
     result = scraper.get_final_download_url(game_id)
-    print(f"Download result type: {type(result)}")
-    print(f"Download result: {result}")
+    debug_log(f"Download result type: {type(result)}")
+    debug_log(f"Download result: {result}")
+    
+    response_data = {}
     
     if result is None:
-        print("ERROR: Result is None")
-        return json_response({'error': 'Failed to get download URL'}, 500)
+        debug_log("ERROR: Result is None")
+        response_data = {'error': 'Failed to get download URL', 'back': request.url_root}
+        return json_response(response_data, 500)
     
     if isinstance(result, dict):
-        print(f"Result status: {result.get('status')}")
+        debug_log(f"Result status: {result.get('status')}")
         if result.get("status") == "cooldown":
-            print(f"Cooldown: {result.get('wait')} seconds")
-            return json_response({'error': 'cooldown', 'wait_seconds': result.get('wait', scraper.download_cooldown)}, 429)
+            debug_log(f"Cooldown: {result.get('wait')} seconds")
+            response_data = {'error': 'cooldown', 'wait_seconds': result.get('wait', scraper.download_cooldown), 'back': request.url_root}
+            return json_response(response_data, 429)
         elif result.get("status") == "rate_limited":
-            print("Rate limited by upstream")
-            return json_response({'error': 'rate_limited', 'message': 'Too many requests'}, 429)
+            debug_log("Rate limited by upstream")
+            response_data = {'error': 'rate_limited', 'message': 'Too many requests', 'back': request.url_root}
+            return json_response(response_data, 429)
         elif result.get("status") == "success":
             original_url = result.get('url')
-            print(f"Original download URL: {original_url}")
-            return json_response({'status': 'success', 'download_url': original_url})
+            debug_log(f"Original download URL: {original_url}")
+            response_data = {'status': 'success', 'download_url': original_url, 'back': request.url_root}
+            return json_response(response_data)
         elif result.get("status") == "error":
             error_msg = result.get('message', 'Unknown error')
-            print(f"ERROR: {error_msg}")
-            return json_response({'error': error_msg}, 500)
+            debug_log(f"ERROR: {error_msg}")
+            response_data = {'error': error_msg, 'back': request.url_root}
+            return json_response(response_data, 500)
     
-    print("ERROR: Unexpected result format")
-    return json_response({'error': 'Failed to get download URL'}, 500)
+    debug_log("ERROR: Unexpected result format")
+    response_data = {'error': 'Failed to get download URL', 'back': request.url_root}
+    return json_response(response_data, 500)
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def catch_all(path):
+    debug_log(f"=== CATCH ALL ROUTE: {path} ===")
     if path.startswith('api/'):
         return json_response({'error': 'Endpoint not found'}, 404)
     game_match = re.match(r'game/(\d+)$', path)
     if game_match:
         return game_details_path(game_match.group(1))
+    debug_log("No match, returning HTML template")
     return render_template('index.html')
 
 if __name__ == '__main__':

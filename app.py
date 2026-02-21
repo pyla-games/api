@@ -145,20 +145,19 @@ class VylaScraper:
         if search_query:
             encoded_query = urllib.parse.quote(search_query)
             url = f"{self.base_url}/?keywords={encoded_query}" + (f"&page={page}" if page > 1 else "")
-            html_content = self.fetch_page(url)
-            if not html_content:
-                return [], False
-            return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
+        elif genre_id and genre_id in self.genres:
+            _, genre_url = self.genres[genre_id]
+            url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
+        else:
+            url = f"{self.base_url}/" + (f"?page={page}" if page > 1 else "")
 
-        if genre_id == '1' or genre_id not in self.genres:
-            return self.get_all_games(page)
-
-        _, genre_url = self.genres[genre_id]
-        url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
         html_content = self.fetch_page(url)
         if not html_content:
             return [], False
-        return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
+
+        games = self._extract_games_from_page(html_content)
+        has_next = self._has_next_page(html_content, page)
+        return games, has_next
 
     def get_game_details(self, game_url):
         html_content = self.fetch_page(game_url)
@@ -437,6 +436,27 @@ def get_download_url(game_id):
     return json_response({
         'error': result.get('message', 'Download failed')
     }, 500)
+
+@app.route('/api/search')
+def api_search():
+    query = request.args.get('q', '')
+    page = int(request.args.get('page', 1))
+
+    if not query:
+        return json_response({'error': 'Query required'}, 400)
+
+    games, has_next = scraper.get_games(None, query, page)
+
+    return json_response({
+        'status': 'success',
+        'search_query': query,
+        'total_results': len(games),
+        'page': page,
+        'has_next': has_next,
+        'games': games,
+        'previous': f'/api/search?q={urllib.parse.quote(query)}&page={page-1}' if page > 1 else None,
+        'next': f'/api/search?q={urllib.parse.quote(query)}&page={page+1}' if has_next else None
+    })
 
 @app.errorhandler(404)
 def not_found(e):

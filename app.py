@@ -11,6 +11,7 @@ from functools import wraps
 import base64
 
 app = Flask(__name__)
+
 class VylaScraper:
     def __init__(self):
         self.base_url = "https://koyso.com"
@@ -25,19 +26,18 @@ class VylaScraper:
             '1': ('All Games', '/'),
             '2': ('Action Games', '/category/action'),
             '3': ('Adventure Games', '/category/adventure'),
-            '4': ('R18+', '/category/r18'),
-            '5': ('Shooting Games', '/category/shooting'),
-            '6': ('Casual Games', '/category/casual'),
-            '7': ('Sports Racing', '/category/sports_racing'),
-            '8': ('Simulation Business', '/category/simulation'),
-            '9': ('Role Playing', '/category/rpg'),
-            '10': ('Strategy Games', '/category/strategy'),
-            '11': ('Fighting Games', '/category/fighting'),
-            '12': ('Horror Games', '/category/horror'),
-            '13': ('Real-time strategy', '/category/rts'),
-            '14': ('Card Game', '/category/card'),
-            '15': ('Indie Games', '/category/indie'),
-            '16': ('LAN connection', '/category/lan')
+            '4': ('Shooting Games', '/category/shooting'),
+            '5': ('Casual Games', '/category/casual'),
+            '6': ('Sports Racing', '/category/sports_racing'),
+            '7': ('Simulation Business', '/category/simulation'),
+            '8': ('Role Playing', '/category/rpg'),
+            '9': ('Strategy Games', '/category/strategy'),
+            '10': ('Fighting Games', '/category/fighting'),
+            '11': ('Horror Games', '/category/horror'),
+            '12': ('Real-time strategy', '/category/rts'),
+            '13': ('Card Game', '/category/card'),
+            '14': ('Indie Games', '/category/indie'),
+            '15': ('LAN connection', '/category/lan')
         }
         self.secret_key = "f6i6@m29r3fwi^yqd"
         self.request_delay = 0.05
@@ -45,8 +45,8 @@ class VylaScraper:
     def fetch_page(self, url, timeout=15):
         try:
             time.sleep(self.request_delay)
-            request = urllib.request.Request(url)
-            response = self.opener.open(request, timeout=timeout)
+            req = urllib.request.Request(url)
+            response = self.opener.open(req, timeout=timeout)
             content = response.read()
             for encoding in ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
                 try:
@@ -55,114 +55,136 @@ class VylaScraper:
                 except UnicodeDecodeError:
                     continue
             return content.decode('utf-8', errors='replace')
-        except Exception as e:
+        except Exception:
             return None
 
     def _extract_games_from_page(self, html_content):
         if not html_content:
             return []
-            
+
         games = []
         patterns = [
             r'<a class="game_item"[^>]*href="([^"]*)"[^>]*>.*?<img[^>]*(?:data-src|src)="([^"]*)"[^>]*>.*?<span[^>]*>([^<]*)</span>',
             r'<a[^>]*class="game[^"]*"[^>]*href="([^"]*)"[^>]*>.*?<img[^>]*src="([^"]*)"[^>]*>.*?<span[^>]*>([^<]*)</span>',
         ]
-        
+
         for pattern in patterns:
             game_item_matches = re.findall(pattern, html_content, re.DOTALL)
             if game_item_matches:
                 break
         else:
             return []
-        
+
         for game_url, image_url, game_title in game_item_matches:
             if not game_url or not game_title.strip():
                 continue
-                
+
             game_id = game_url.strip().split('/')[-1]
             if not game_id or not game_id.isdigit():
                 continue
-            
+
             proxied_image = self._create_proxy_url(image_url)
-            
+
             games.append({
                 'title': html.unescape(game_title.strip()),
                 'id': game_id,
                 'image_url': proxied_image,
                 'view': f'/api/game/{game_id}'
             })
-        
+
         return games
 
     def _create_proxy_url(self, original_url):
         if not original_url or not original_url.startswith('http'):
             return ''
-        
+
         encoded = base64.urlsafe_b64encode(original_url.encode()).decode()
         return f'/{encoded}'
 
     def _has_next_page(self, html_content, current_page):
         if not html_content:
             return False
-            
+
         next_page_pattern = r'<a[^>]*href="[^"]*\?page={}"[^>]*>'.format(current_page + 1)
         if re.search(next_page_pattern, html_content):
             return True
-        
+
         pagination_text = re.search(r'<a>(\d+)/(\d+)</a>', html_content)
         if pagination_text:
             current, total = pagination_text.groups()
             if int(current) < int(total):
                 return True
-        
+
         return False
+
+    def get_all_games(self, page=1):
+        safe_genres = [gid for gid in self.genres if gid != '1']  
+        seen_ids = set()
+        combined = []
+        has_next = False
+
+        for gid in safe_genres:
+            _, genre_url = self.genres[gid]
+            url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
+            html_content = self.fetch_page(url)
+            if not html_content:
+                continue
+            games = self._extract_games_from_page(html_content)
+            if self._has_next_page(html_content, page):
+                has_next = True
+            for g in games:
+                if g['id'] not in seen_ids:
+                    seen_ids.add(g['id'])
+                    combined.append(g)
+
+        return combined, has_next
 
     def get_games(self, genre_id=None, search_query=None, page=1):
         if search_query:
             encoded_query = urllib.parse.quote(search_query)
             url = f"{self.base_url}/?keywords={encoded_query}" + (f"&page={page}" if page > 1 else "")
-        elif genre_id and genre_id in self.genres:
-            genre_name, genre_url = self.genres[genre_id]
-            url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
-        else:
-            url = f"{self.base_url}/" + (f"?page={page}" if page > 1 else "")
-        
+            html_content = self.fetch_page(url)
+            if not html_content:
+                return [], False
+            return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
+
+        if genre_id == '1' or genre_id not in self.genres:
+            return self.get_all_games(page)
+
+        _, genre_url = self.genres[genre_id]
+        url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
         html_content = self.fetch_page(url)
         if not html_content:
             return [], False
-        
-        games = self._extract_games_from_page(html_content)
-        has_next = self._has_next_page(html_content, page)
-        
-        return games, has_next
+        return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
 
     def get_game_details(self, game_url):
         html_content = self.fetch_page(game_url)
         if not html_content:
             return None
-        
+
         details = {}
-        
+
         title_patterns = [
             r'<h1 class="content_title"[^>]*>(.*?)</h1>',
             r'<h1[^>]*>(.*?)</h1>',
             r'<title>([^<]+)</title>'
         ]
-        
+
         for pattern in title_patterns:
             title_match = re.search(pattern, html_content, re.DOTALL)
             if title_match:
                 details['title'] = html.unescape(re.sub(r'<[^>]*>', '', title_match.group(1)).strip())
                 break
-        
+
         if 'title' not in details:
             details['title'] = 'Unknown Game'
-        
+
         content_patterns = [
             r'<div class="content_body">(.*?)</div>',
             r'<div[^>]*class="[^"]*description[^"]*"[^>]*>(.*?)</div>',
         ]
-        
+
         for pattern in content_patterns:
             content_match = re.search(pattern, html_content, re.DOTALL)
             if content_match:
@@ -176,51 +198,51 @@ class VylaScraper:
                         clean_paragraphs.append(p)
                 details['full_description'] = html.unescape('|||'.join(clean_paragraphs))
                 break
-        
+
         if 'full_description' not in details:
             details['full_description'] = 'No description available'
-        
+
         all_images = re.findall(r'https?://[^\s"\'<>]+\.(?:jpg|png|gif|webp|avif|jpeg)', html_content, re.IGNORECASE)
         all_videos = re.findall(r'https?://[^\s"\'<>]+\.(?:mp4|webm)', html_content, re.IGNORECASE)
-        
+
         unique_images = list(dict.fromkeys(all_images))[:30]
         unique_videos = list(dict.fromkeys(all_videos))[:10]
-        
+
         details['media'] = {
             'images': [self._create_proxy_url(img) for img in unique_images],
             'videos': [self._create_proxy_url(vid) for vid in unique_videos]
         }
-        
+
         size_match = re.search(r'<li>\s*<span>Size</span>\s*<span>([^<]+)</span>', html_content, re.DOTALL)
         details['size'] = size_match.group(1).strip() if size_match else 'Unknown'
-        
+
         version_match = re.search(r'<li>\s*<span>Version</span>\s*<span[^>]*>([^<]+)</span>', html_content, re.DOTALL)
         details['version'] = version_match.group(1).strip() if version_match else 'Unknown'
-        
+
         recommendations = []
         rec_pattern = r'<a class="recommendations_item" href="https://koyso\.com/game/(\d+)"[^>]*title="([^"]*)"'
         rec_matches = re.findall(rec_pattern, html_content)
-        
+
         for rec_id, rec_title in rec_matches[:6]:
             rec_img_pattern = f'<a class="recommendations_item" href="https://koyso\\.com/game/{rec_id}".*?<img[^>]*src="([^"]+)"'
             rec_img_match = re.search(rec_img_pattern, html_content, re.DOTALL)
             rec_image = self._create_proxy_url(rec_img_match.group(1)) if rec_img_match else ''
-            
+
             recommendations.append({
                 'id': rec_id,
                 'title': html.unescape(rec_title),
                 'image_url': rec_image,
                 'view': f'/api/game/{rec_id}'
             })
-        
+
         if recommendations:
             details['recommendations'] = recommendations
-        
+
         game_id = game_url.split('/')[-1]
         details['id'] = game_id
         details['download_url'] = f"/api/download/{game_id}"
         details['back'] = request.url_root
-        
+
         return details
 
     def get_final_download_url(self, game_id):
@@ -228,26 +250,26 @@ class VylaScraper:
             timestamp = str(int(time.time()))
             hash_input = timestamp + game_id + self.secret_key
             sign = hashlib.sha256(hash_input.encode()).hexdigest()
-            
+
             download_api_url = f"{self.base_url}/api/getGamesDownloadUrl"
-            
+
             post_data = {
                 'id': game_id,
                 'timestamp': timestamp,
                 'secretKey': sign,
                 'canvasId': '0'
             }
-            
+
             encoded_data = urllib.parse.urlencode(post_data).encode('utf-8')
             req = urllib.request.Request(download_api_url, data=encoded_data, method='POST')
             req.add_header('Content-Type', 'application/x-www-form-urlencoded')
             req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
             req.add_header('Accept', 'application/json, text/plain, */*')
             req.add_header('Referer', f'{self.base_url}/download/{game_id}')
-            
+
             response = urllib.request.urlopen(req, timeout=30)
             response_data = response.read().decode('utf-8')
-            
+
             try:
                 json_response = json.loads(response_data)
                 if isinstance(json_response, str) and json_response.startswith('http'):
@@ -259,14 +281,14 @@ class VylaScraper:
             except json.JSONDecodeError:
                 if response_data and response_data.startswith('http'):
                     return {"status": "success", "url": response_data.strip()}
-            
+
             return {"status": "error", "message": "No download URL found"}
-            
+
         except urllib.error.HTTPError as e:
             if e.code == 429:
                 return {"status": "rate_limited", "message": "Too many requests"}
             return {"status": "error", "message": f"HTTP {e.code}"}
-        except Exception as e:
+        except Exception:
             return {"status": "error", "message": "Download service unavailable"}
 
 scraper = VylaScraper()
@@ -295,29 +317,29 @@ def json_response(data, status_code=200):
 def proxy_media(encoded_url):
     try:
         original_url = base64.urlsafe_b64decode(encoded_url.encode()).decode()
-        
+
         req = urllib.request.Request(original_url)
         req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         req.add_header('Referer', 'https://koyso.com/')
         req.add_header('Accept', 'image/webp,image/*,*/*')
-        
+
         with urllib.request.urlopen(req, timeout=10) as response:
             content = response.read()
             content_type = response.headers.get('Content-Type', 'application/octet-stream')
-            
+
             flask_response = app.make_response(content)
             flask_response.headers['Content-Type'] = content_type
             flask_response.headers['Cache-Control'] = 'public, max-age=31536000'
-            
+
             return flask_response
-            
-    except Exception as e:
+
+    except Exception:
         return ('Image not available', 404)
 
 @app.route('/api/health')
 def health_check():
     try:
-        test_games, _ = scraper.get_games('1', None, 1)
+        test_games, _ = scraper.get_games('2', None, 1)
         return json_response({
             "status": "healthy" if len(test_games) > 0 else "degraded",
             "timestamp": int(time.time())
@@ -331,7 +353,7 @@ def get_genres():
         {"id": gid, "name": gname, "url": f"/api/games?genre={gid}&page=1"}
         for gid, (gname, _) in scraper.genres.items()
     ]
-    
+
     return json_response({
         "api_version": "2.0",
         "total_genres": len(genres_list),
@@ -340,36 +362,36 @@ def get_genres():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
-
-@app.route('/api/search')
-def api_search():
-    query = request.args.get('q', '')
-    page = int(request.args.get('page', 1))
-    
-    if not query:
-        return json_response({'error': 'Query required'}, 400)
-    
-    games, has_next = scraper.get_games(None, query, page)
-    
-    return json_response({
-        'status': 'success',
-        'search_query': query,
-        'total_results': len(games),
-        'page': page,
-        'has_next': has_next,
-        'games': games,
-        'previous': f'/api/search?q={urllib.parse.quote(query)}&page={page-1}' if page > 1 else None,
-        'next': f'/api/search?q={urllib.parse.quote(query)}&page={page+1}' if has_next else None
+    genres_list = [
+        {"id": gid, "name": gname, "url": f"/api/games?genre={gid}&page=1"}
+        for gid, (gname, _) in scraper.genres.items()
+    ]
+    return jsonify({
+        "api_version": "2.0",
+        "endpoints": {
+            "health":       "/api/health",
+            "genres":       "/api/genres",
+            "games":        "/api/games?genre={genre_id}&page={page}",
+            "search":       "/api/search?q={query}&page={page}",
+            "game_details": "/api/game/{game_id}",
+            "download":     "/api/download/{game_id}",
+            "proxy_media":  "/{base64_encoded_url}"
+        },
+        "search": {
+            "usage":   "GET /api/search?q={query}&page={page}",
+            "example": "/api/search?q=minecraft&page=1",
+            "note":    "Returns paginated results with has_next and next/previous links"
+        },
+        "available_genres": genres_list
     })
 
 @app.route('/api/games')
 def get_games():
     genre_id = request.args.get('genre', '1')
     page = int(request.args.get('page', 1))
-    
+
     games, has_next = scraper.get_games(genre_id, None, page)
-    
+
     return json_response({
         'status': 'success',
         'genre': scraper.genres.get(genre_id, ('Unknown', ''))[0],
@@ -386,30 +408,30 @@ def get_games():
 def get_game(game_id):
     if not game_id.isdigit():
         return json_response({'error': 'Invalid game ID'}, 400)
-    
+
     details = scraper.get_game_details(f"https://koyso.com/game/{game_id}")
-    
+
     if details:
         return json_response(details)
-    
+
     return json_response({'error': 'Game not found'}, 404)
 
 @app.route('/api/download/<game_id>')
 def get_download_url(game_id):
     if not game_id.isdigit():
         return json_response({'error': 'Invalid game ID'}, 400)
-    
+
     result = scraper.get_final_download_url(game_id)
-    
+
     if not result:
         return json_response({'error': 'Download service error'}, 500)
-    
+
     if result.get("status") == "success":
         return json_response({
             'status': 'success',
             'download_url': result.get('url')
         })
-    
+
     return json_response({
         'error': result.get('message', 'Download failed')
     }, 500)

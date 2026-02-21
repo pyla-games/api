@@ -244,19 +244,18 @@ GET /{base64_url}
 | 1  | All Games           |
 | 2  | Action Games        |
 | 3  | Adventure Games     |
-| 4  | R18+                |
-| 5  | Shooting Games      |
-| 6  | Casual Games        |
-| 7  | Sports Racing       |
-| 8  | Simulation Business |
-| 9  | Role Playing        |
-| 10 | Strategy Games      |
-| 11 | Fighting Games      |
-| 12 | Horror Games        |
-| 13 | Real-time strategy  |
-| 14 | Card Game           |
-| 15 | Indie Games         |
-| 16 | LAN connection      |
+| 4  | Shooting Games      |
+| 5  | Casual Games        |
+| 6  | Sports Racing       |
+| 7  | Simulation Business |
+| 8  | Role Playing        |
+| 9  | Strategy Games      |
+| 10 | Fighting Games      |
+| 11 | Horror Games        |
+| 12 | Real-time strategy  |
+| 13 | Card Game           |
+| 14 | Indie Games         |
+| 15 | LAN connection      |
 
 ## Configuration
 

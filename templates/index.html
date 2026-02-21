@@ -2,73 +2,34 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,viewport-fit=cover">
-    <meta name="color-scheme" content="light dark">
-    <meta name="theme-color" content="transparent">
-    <meta name="apple-mobile-web-app-status-bar-style" content="transparent">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
-    <link rel="apple-touch-icon" href="/static/images/manifest-icon.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/static/images/manifest-icon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/manifest-icon.png" />
-    <link rel="apple-touch-icon" sizes="167x167" href="/static/images/manifest-icon.png" />
-    <title>Vyla Games API</title>
-    <meta name="description" content="Vyla Games JSON API - Access thousands of games programmatically">
-    <meta name="keywords" content="vyla games api, json api, game database, free games api">
-    <meta name="author" content="Vyla Team">
-    <meta property="og:title" content="Vyla Games API">
-    <meta property="og:description" content="JSON API for game discovery and downloads">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://vyla-games.vercel.app/">
-    <meta property="og:image" content="/static/images/background.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Vyla Games API">
-    <meta name="twitter:description" content="JSON API for game discovery and downloads">
-    <meta name="twitter:image" content="/static/images/background.png">
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="transparent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="transparent">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico" />
+  <link rel="apple-touch-icon" href="/static/images/manifest-icon.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/static/images/manifest-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/images/manifest-icon.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="/static/images/manifest-icon.png" />
+  <title>Vyla Games API</title>
+  <meta name="description" content="Vyla Games JSON API - Access thousands of games programmatically">
+  <meta name="keywords" content="vyla games api, json api, game database, free games api">
+  <meta name="author" content="Vyla Team">
+  <meta property="og:title" content="Vyla Games API">
+  <meta property="og:description" content="JSON API for game discovery and downloads">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vyla-games.vercel.app/">
+  <meta property="og:image" content="/static/images/background.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Vyla Games API">
+  <meta name="twitter:description" content="JSON API for game discovery and downloads">
+  <meta name="twitter:image" content="/static/images/background.png">
 
-    <script src="/static/js/app.js"></script>
-
+  <script src="/static/js/app.js"></script>
 </head>
-
-<body>
-    <pre id="output">{
-  "api_version": "2.0",
-  "endpoints": {
-    "health": "/api/health",
-    "genres": "/api/genres",
-    "games": "/api/games?genre={genre_id}&page={page}",
-    "search": "/api/search?q={query}&page={page}",
-    "game_details": "/api/game/{game_id}",
-    "download": "/api/download/{game_id}",
-    "proxy_media": "/{base64_encoded_url}"
-  },
-  "search": {
-    "usage": "GET /api/search?q={query}&page={page}",
-    "example": "/api/search?q=minecraft&page=1",
-    "note": "Returns paginated results with has_next and next/previous links"
-  },
-  "available_genres": [
-    {"id": "1", "name": "All Games", "url": "/api/games?genre=1&page=1"},
-    {"id": "2", "name": "Action Games", "url": "/api/games?genre=2&page=1"},
-    {"id": "3", "name": "Adventure Games", "url": "/api/games?genre=3&page=1"},
-    {"id": "4", "name": "R18+", "url": "/api/games?genre=4&page=1"},
-    {"id": "5", "name": "Shooting Games", "url": "/api/games?genre=5&page=1"},
-    {"id": "6", "name": "Casual Games", "url": "/api/games?genre=6&page=1"},
-    {"id": "7", "name": "Sports Racing", "url": "/api/games?genre=7&page=1"},
-    {"id": "8", "name": "Simulation Business", "url": "/api/games?genre=8&page=1"},
-    {"id": "9", "name": "Role Playing", "url": "/api/games?genre=9&page=1"},
-    {"id": "10", "name": "Strategy Games", "url": "/api/games?genre=10&page=1"},
-    {"id": "11", "name": "Fighting Games", "url": "/api/games?genre=11&page=1"},
-    {"id": "12", "name": "Horror Games", "url": "/api/games?genre=12&page=1"},
-    {"id": "13", "name": "Real-time strategy", "url": "/api/games?genre=13&page=1"},
-    {"id": "14", "name": "Card Game", "url": "/api/games?genre=14&page=1"},
-    {"id": "15", "name": "Indie Games", "url": "/api/games?genre=15&page=1"},
-    {"id": "16", "name": "LAN connection", "url": "/api/games?genre=16&page=1"}
-  ]
-}</pre>
-</body>
 
 </html>

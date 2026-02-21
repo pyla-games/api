@@ -118,26 +118,28 @@ class VylaScraper:
         return False
 
     def get_all_games(self, page=1):
-        safe_genres = [gid for gid in self.genres if gid != '1']  
+        safe_genres = [gid for gid in self.genres if gid != '1']
         seen_ids = set()
         combined = []
-        has_next = False
 
         for gid in safe_genres:
             _, genre_url = self.genres[gid]
-            url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
+            url = f"{self.base_url}{genre_url}"
             html_content = self.fetch_page(url)
             if not html_content:
                 continue
             games = self._extract_games_from_page(html_content)
-            if self._has_next_page(html_content, page):
-                has_next = True
             for g in games:
                 if g['id'] not in seen_ids:
                     seen_ids.add(g['id'])
                     combined.append(g)
 
-        return combined, has_next
+        page_size = 30
+        start = (page - 1) * page_size
+        end = start + page_size
+        has_next = end < len(combined)
+
+        return combined[start:end], has_next
 
     def get_games(self, genre_id=None, search_query=None, page=1):
         if search_query:

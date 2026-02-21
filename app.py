@@ -363,6 +363,7 @@ def index():
         {"id": gid, "name": gname, "url": f"/api/games?genre={gid}&page=1"}
         for gid, (gname, _) in scraper.genres.items()
     ]
+
     return jsonify({
         "api_version": "2.0",
         "endpoints": {
@@ -374,6 +375,7 @@ def index():
             "download":     "/api/download/{game_id}",
             "proxy_media":  "/{base64_encoded_url}"
         },
+        "frontend": "https://vyla-games-frontend.vercel.app",
         "search": {
             "usage":   "GET /api/search?q={query}&page={page}",
             "example": "/api/search?q=minecraft&page=1",

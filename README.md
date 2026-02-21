@@ -296,16 +296,6 @@ Edit `index.html` to modify:
 * Grid layout
 * Card styling
 
-## Debugging
-
-Enable debug logs:
-
-```python
-DEBUG = True
-```
-
-Logs include all HTTP requests, scraping results, proxy activity, and download authentication.
-
 ## Deployment Options
 
 * Vercel: `vercel --prod`

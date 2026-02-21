@@ -117,47 +117,43 @@ class VylaScraper:
 
         return False
 
-    def get_all_games(self, page=1):
-        safe_genres = [gid for gid in self.genres if gid != '1']
-        seen_ids = set()
-        combined = []
-
-        for gid in safe_genres:
-            _, genre_url = self.genres[gid]
-            url = f"{self.base_url}{genre_url}"
-            html_content = self.fetch_page(url)
-            if not html_content:
-                continue
-            games = self._extract_games_from_page(html_content)
-            for g in games:
-                if g['id'] not in seen_ids:
-                    seen_ids.add(g['id'])
-                    combined.append(g)
-
-        page_size = 30
-        start = (page - 1) * page_size
-        end = start + page_size
-        has_next = end < len(combined)
-
-        return combined[start:end], has_next
-
     def get_games(self, genre_id=None, search_query=None, page=1):
         if search_query:
             encoded_query = urllib.parse.quote(search_query)
             url = f"{self.base_url}/?keywords={encoded_query}" + (f"&page={page}" if page > 1 else "")
-        elif genre_id and genre_id in self.genres:
-            _, genre_url = self.genres[genre_id]
-            url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
-        else:
-            url = f"{self.base_url}/" + (f"?page={page}" if page > 1 else "")
+            html_content = self.fetch_page(url)
+            if not html_content:
+                return [], False
+            games = self._extract_games_from_page(html_content)
+            has_next = self._has_next_page(html_content, page)
+            return games, has_next
 
+        safe_genres = [gid for gid, (_, path) in self.genres.items() if gid != '1' and 'r18' not in path]
+
+        if genre_id == '1' or genre_id not in self.genres:
+            seen_ids = set()
+            combined = []
+            for gid in safe_genres:
+                _, genre_url = self.genres[gid]
+                url = f"{self.base_url}{genre_url}"
+                html_content = self.fetch_page(url)
+                if not html_content:
+                    continue
+                for g in self._extract_games_from_page(html_content):
+                    if g['id'] not in seen_ids:
+                        seen_ids.add(g['id'])
+                        combined.append(g)
+            page_size = 30
+            start = (page - 1) * page_size
+            end = start + page_size
+            return combined[start:end], end < len(combined)
+
+        _, genre_url = self.genres[genre_id]
+        url = f"{self.base_url}{genre_url}" + (f"?page={page}" if page > 1 else "")
         html_content = self.fetch_page(url)
         if not html_content:
             return [], False
-
-        games = self._extract_games_from_page(html_content)
-        has_next = self._has_next_page(html_content, page)
-        return games, has_next
+        return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
 
     def get_game_details(self, game_url):
         html_content = self.fetch_page(game_url)
@@ -389,7 +385,7 @@ def index():
 @app.route('/api/games')
 def get_games():
     genre_id = request.args.get('genre', '1')
-    page = int(request.args.get('page', 1))
+    page = int(request.args.get('page') or 1)
 
     games, has_next = scraper.get_games(genre_id, None, page)
 
@@ -440,7 +436,7 @@ def get_download_url(game_id):
 @app.route('/api/search')
 def api_search():
     query = request.args.get('q', '')
-    page = int(request.args.get('page', 1))
+    page = int(request.args.get('page') or 1)
 
     if not query:
         return json_response({'error': 'Query required'}, 400)

@@ -11,13 +11,6 @@ from functools import wraps
 import base64
 
 app = Flask(__name__)
-
-DEBUG = True
-
-def debug_log(msg, *args):
-    if DEBUG:
-        print(f"[VYLA-BACKEND] {msg}", *args)
-
 class VylaScraper:
     def __init__(self):
         self.base_url = "https://koyso.com"
@@ -63,7 +56,6 @@ class VylaScraper:
                     continue
             return content.decode('utf-8', errors='replace')
         except Exception as e:
-            debug_log(f"Error fetching {url}: {str(e)}")
             return None
 
     def _extract_games_from_page(self, html_content):
@@ -107,7 +99,7 @@ class VylaScraper:
             return ''
         
         encoded = base64.urlsafe_b64encode(original_url.encode()).decode()
-        return f'/proxy/{encoded}'
+        return f'/{encoded}'
 
     def _has_next_page(self, html_content, current_page):
         if not html_content:
@@ -299,11 +291,10 @@ def json_response(data, status_code=200):
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     return response
 
-@app.route('/proxy/<path:encoded_url>')
+@app.route('/<path:encoded_url>')
 def proxy_media(encoded_url):
     try:
         original_url = base64.urlsafe_b64decode(encoded_url.encode()).decode()
-        debug_log(f"Proxying: {original_url[:100]}")
         
         req = urllib.request.Request(original_url)
         req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
@@ -321,7 +312,6 @@ def proxy_media(encoded_url):
             return flask_response
             
     except Exception as e:
-        debug_log(f"Proxy error: {str(e)}")
         return ('Image not available', 404)
 
 @app.route('/api/health')
@@ -330,7 +320,6 @@ def health_check():
         test_games, _ = scraper.get_games('1', None, 1)
         return json_response({
             "status": "healthy" if len(test_games) > 0 else "degraded",
-            "games_found": len(test_games),
             "timestamp": int(time.time())
         })
     except Exception as e:
@@ -351,8 +340,6 @@ def get_genres():
 
 @app.route('/')
 def index():
-    if 'application/json' in request.headers.get('Accept', ''):
-        return get_genres()
     return render_template('index.html')
 
 @app.route('/api/search')
@@ -434,6 +421,3 @@ def not_found(e):
 @app.errorhandler(500)
 def internal_error(e):
     return json_response({'error': 'Internal server error'}, 500)
-
-if __name__ == '__main__':
-    app.run(debug=True)

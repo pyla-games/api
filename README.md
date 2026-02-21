@@ -147,7 +147,7 @@ GET /api/games?genre={id}&page={n}
   "page": 1,
   "has_next": true,
   "games": [
-    { "title": "Game Title", "id": "1927", "image_url": "/proxy/aHR0cHM6Ly9...", "view": "/api/game/1927" }
+    { "title": "Game Title", "id": "1927", "image_url": "/aHR0cHM6Ly9...", "view": "/api/game/1927" }
   ],
   "previous": null,
   "next": "/api/games?genre=2&page=2"
@@ -195,9 +195,9 @@ GET /api/game/{game_id}
   "full_description": "Paragraph 1|||Paragraph 2|||Paragraph 3",
   "size": "2.5GB",
   "version": "v1.0.5",
-  "media": { "images": ["/proxy/aHR0cHM6Ly9..."], "videos": ["/proxy/aHR0cHM6Ly9..."] },
+  "media": { "images": ["/aHR0cHM6Ly9..."], "videos": ["/aHR0cHM6Ly9..."] },
   "recommendations": [
-    { "id": "1930", "title": "Similar Game", "image_url": "/proxy/aHR0cHM6Ly9...", "view": "/api/game/1930" }
+    { "id": "1930", "title": "Similar Game", "image_url": "/aHR0cHM6Ly9...", "view": "/api/game/1930" }
   ],
   "download_url": "/api/download/1927",
   "back": "/"
@@ -230,7 +230,7 @@ GET /api/download/{game_id}
 #### Proxied Media
 
 ```http
-GET /proxy/{base64_url}
+GET /{base64_url}
 ```
 
 * Decodes base64 URL
@@ -274,7 +274,7 @@ self.secret_key = "f6i6@m29r3fwi^yqd"
 
 ```
 Original URL: https://koyso.com/image.jpg
-Encoded: /proxy/aHR0cHM6Ly9rb3lzby5jb20vaW1hZ2UuanBn
+Encoded: /aHR0cHM6Ly9rb3lzby5jb20vaW1hZ2UuanBn
 ```
 
 **Workflow:**
@@ -365,8 +365,6 @@ for game in games:
 fetch('https://vyla-games.vercel.app/api/game/1927')
   .then(res => res.json())
   .then(game => {
-    console.log(game.title);
-    console.log(game.media.images);
   });
 ```
 

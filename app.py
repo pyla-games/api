@@ -199,11 +199,21 @@ class VylaScraper:
         if 'full_description' not in details:
             details['full_description'] = 'No description available'
 
-        all_images = re.findall(r'https?://[^\s"\'<>]+\.(?:jpg|png|gif|webp|avif|jpeg)', html_content, re.IGNORECASE)
-        all_videos = re.findall(r'https?://[^\s"\'<>]+\.(?:mp4|webm)', html_content, re.IGNORECASE)
+        rec_split = re.split(r'class="recommendations', html_content, maxsplit=1)
+        main_content = rec_split[0] if len(rec_split) > 1 else html_content
+
+        all_images = re.findall(r'https?://[^\s"\'<>]+\.(?:jpg|png|gif|webp|avif|jpeg)', main_content, re.IGNORECASE)
+        all_videos = re.findall(r'https?://[^\s"\'<>]+\.(?:mp4|webm)', main_content, re.IGNORECASE)
 
         unique_images = list(dict.fromkeys(all_images))[:30]
-        unique_videos = list(dict.fromkeys(all_videos))[:10]
+        seen_stems = set()
+        deduped_videos = []
+        for v in all_videos:
+            stem = re.sub(r'\.(webm|mp4)$', '', v, flags=re.IGNORECASE)
+            if stem not in seen_stems:
+                seen_stems.add(stem)
+                deduped_videos.append(v)
+        unique_videos = deduped_videos[:10]
 
         details['media'] = {
             'images': [self._create_proxy_url(img) for img in unique_images],

@@ -12,7 +12,7 @@ A modern Flask-based game discovery and download API. Scrapes game data from koy
 * **CORS Enabled** – Use the API from any frontend
 * **No Rate Limits** – Instant downloads without cooldowns
 * **Media Proxying** – All images and videos served through the API
-* **16 Game Categories** – Action, Adventure, RPG, Horror, and more
+* **15 Game Categories** – Action, Adventure, RPG, Horror, and more
 * **Full-Text Search** – Find games by keyword with pagination
 * **Rich Metadata** – Screenshots, videos, descriptions, recommendations
 * **Mobile-Responsive** – Works on all devices
@@ -70,15 +70,20 @@ vercel --prod
 
 ## Web Interface
 
-Access the web interface at `/` for:
+A full frontend is available at [https://pyla.vercel.app](https://pyla.vercel.app):
 
-* Browse games by genre
-* Search games by name
-* Game cards in a grid layout
-* Game details modal with screenshots, videos, and descriptions
-* One-click downloads
-* Recommendations for similar games
-* Pagination for easy navigation
+* Browse games by genre with horizontal scrolling rows
+* Search games by keyword with debounced input
+* Hero carousel with auto-advancing slides and touch/swipe support
+* Game cards with bookmark support
+* Game detail modal with hero video/image, description, screenshots, and videos
+* One-click downloads with loading state
+* Recommendations grid inside game modal
+* Sort games A–Z / Z–A within any view
+* View All overlay per genre with pagination
+* Dark/light theme toggle
+* Back-to-top button
+* Mobile responsive with drag-to-close modals
 
 ## API Documentation
 
@@ -102,7 +107,6 @@ GET /api/health
 ```json
 {
   "status": "healthy",
-  "games_found": 42,
   "timestamp": 1738368000
 }
 ```
@@ -118,7 +122,7 @@ GET /api/genres
 ```json
 {
   "api_version": "2.0",
-  "total_genres": 16,
+  "total_genres": 56,
   "genres": [
     { "id": "1", "name": "All Games", "url": "/api/games?genre=1&page=1" }
   ]
@@ -133,7 +137,7 @@ GET /api/games?genre={id}&page={n}
 
 **Parameters:**
 
-* `genre` – Genre ID (1-16, default: 1)
+* `genre` – Genre ID (1-15, default: 1)
 * `page` – Page number (default: 1)
 
 **Response:**

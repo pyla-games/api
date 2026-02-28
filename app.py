@@ -41,8 +41,6 @@ class VylaScraper:
         }
         self.secret_key = "f6i6@m29r3fwi^yqd"
         self.request_delay = 0.05
-        self.invalid_game_ids = set()
-        self._load_invalid_cache()
 
     def fetch_page(self, url, timeout=15):
         try:
@@ -59,20 +57,6 @@ class VylaScraper:
             return content.decode('utf-8', errors='replace')
         except Exception:
             return None
-
-    def _load_invalid_cache(self):
-        try:
-            with open('invalid_ids.txt', 'r') as f:
-                self.invalid_game_ids = set(f.read().splitlines())
-        except:
-            pass
-
-    def _save_invalid_cache(self):
-        try:
-            with open('invalid_ids.txt', 'w') as f:
-                f.write('\n'.join(self.invalid_game_ids))
-        except:
-            pass
 
     def _extract_games_from_page(self, html_content):
         if not html_content:
@@ -97,9 +81,6 @@ class VylaScraper:
 
             game_id = game_url.strip().split('/')[-1]
             if not game_id or not game_id.isdigit():
-                continue
-
-            if game_id in self.invalid_game_ids:
                 continue
 
             proxied_image = self._create_proxy_url(image_url)
@@ -175,17 +156,8 @@ class VylaScraper:
         return self._extract_games_from_page(html_content), self._has_next_page(html_content, page)
 
     def get_game_details(self, game_url):
-        game_id = game_url.split('/')[-1]
-        if game_id in self.invalid_game_ids:
-            return None
-
         html_content = self.fetch_page(game_url)
-        if not html_content or len(html_content) < 500:
-            self.invalid_game_ids.add(game_id)
-            return None
-
-        if not re.search(r'class="content_title"', html_content):
-            self.invalid_game_ids.add(game_id)
+        if not html_content:
             return None
 
         details = {}
@@ -273,6 +245,7 @@ class VylaScraper:
         if recommendations:
             details['recommendations'] = recommendations
 
+        game_id = game_url.split('/')[-1]
         details['id'] = game_id
         details['download_url'] = f"/api/download/{game_id}"
         details['back'] = request.url_root
@@ -421,12 +394,31 @@ def index():
         "available_genres": genres_list
     })
 
+def _filter_valid_games(games):
+    import concurrent.futures
+
+    def check(game):
+        try:
+            url = f"https://koyso.com/game/{game['id']}"
+            req = urllib.request.Request(url)
+            req.add_header('User-Agent', 'Mozilla/5.0')
+            response = urllib.request.urlopen(req, timeout=5)
+            return game if response.status == 200 else None
+        except:
+            return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(check, games))
+
+    return [g for g in results if g is not None]
+
 @app.route('/api/games')
 def get_games():
     genre_id = request.args.get('genre', '1')
     page = int(request.args.get('page') or 1)
 
     games, has_next = scraper.get_games(genre_id, None, page)
+    games = _filter_valid_games(games)
 
     return json_response({
         'status': 'success',
@@ -450,8 +442,6 @@ def get_game(game_id):
     if details:
         return json_response(details)
 
-    scraper.invalid_game_ids.add(game_id)
-    scraper._save_invalid_cache()
     return json_response({'error': 'Game not found'}, 404)
 
 @app.route('/api/download/<game_id>')
@@ -483,6 +473,7 @@ def api_search():
         return json_response({'error': 'Query required'}, 400)
 
     games, has_next = scraper.get_games(None, query, page)
+    games = _filter_valid_games(games)
 
     return json_response({
         'status': 'success',

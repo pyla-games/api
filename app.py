@@ -171,7 +171,9 @@ class VylaScraper:
         for pattern in title_patterns:
             title_match = re.search(pattern, html_content, re.DOTALL)
             if title_match:
-                details['title'] = html.unescape(re.sub(r'<[^>]*>', '', title_match.group(1)).strip())
+                title = html.unescape(re.sub(r'<[^>]*>', '', title_match.group(1)).strip())
+                title = re.sub(r'\s*Free\s+Download\s*$', '', title, flags=re.IGNORECASE).strip()
+                details['title'] = title
                 break
 
         if 'title' not in details:

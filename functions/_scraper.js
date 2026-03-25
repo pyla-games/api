@@ -216,99 +216,20 @@ export async function getGameDetails(gameId) {
 
 export async function getFinalDownloadUrl(gameId) {
     try {
-        const timestamp = String(Math.floor(Date.now() / 1000));
-        const hashInput = timestamp + gameId + SECRET_KEY;
+        const PROXY_URL = 'https://vyla-api.onrender.com';
 
-        const encoder = new TextEncoder();
-        const data = encoder.encode(hashInput);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-        const canvasId = String(Math.floor(Math.random() * 900000000) + 100000000);
-
-        const body = new URLSearchParams({
-            id: gameId,
-            timestamp,
-            secretKey: sign,
-            canvasId: canvasId,
+        const res = await fetch(`${PROXY_URL}/download/${gameId}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
         });
 
-        const targetUrl = `${BASE_URL}/api/getGamesDownloadUrl`;
-        const refererUrl = `${BASE_URL}/download/${gameId}`;
+        if (!res.ok) return { status: 'error', message: `Proxy returned ${res.status}` };
 
-        const proxies = [
-            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-            `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
-        ];
-
-        let res = null;
-        let lastError = '';
-
-        for (const proxyUrl of proxies) {
-            try {
-                res = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                        'Accept': 'application/json, text/javascript, */*; q=0.01',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Referer': refererUrl,
-                        'Origin': BASE_URL,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-                        'Sec-Ch-Ua-Mobile': '?0',
-                        'Sec-Ch-Ua-Platform': '"Windows"',
-                        'Sec-Fetch-Dest': 'empty',
-                        'Sec-Fetch-Mode': 'cors',
-                        'Sec-Fetch-Site': 'same-origin',
-                    },
-                    body: body.toString(),
-                });
-
-                if (res.ok) break;
-                lastError = `proxy ${proxyUrl} returned ${res.status}`;
-            } catch (e) {
-                lastError = `proxy ${proxyUrl} threw: ${e.message}`;
-                res = null;
-            }
-        }
-
-        if (!res || !res.ok) {
-            return { status: 'error', message: `All proxies failed. Last: ${lastError}` };
-        }
-
-        const text = await res.text();
-        const cleanText = text.trim().replace(/^"|"$/g, '');
-
-        if (cleanText.startsWith('http')) {
-            return { status: 'success', url: cleanText };
-        }
-
-        try {
-            const json = JSON.parse(text);
-            const url = json.url || json.download_url || (json.data && json.data.url) || (typeof json.data === 'string' ? json.data : null);
-
-            if (url && typeof url === 'string' && url.startsWith('http')) {
-                return { status: 'success', url };
-            }
-
-            return { status: 'error', message: json.msg || json.message || 'No URL found in response' };
-        } catch (e) {
-            return {
-                status: 'error',
-                message: 'Firewall block after proxy. Response: ' + cleanText.substring(0, 150),
-                debug: {
-                    status: res.status,
-                    fullBody: cleanText.substring(0, 2000),
-                }
-            };
-        }
+        const json = await res.json();
+        return json;
 
     } catch (err) {
-        return { status: 'error', message: err.message || 'Download service unavailable' };
+        return { status: 'error', message: err.message || 'Proxy unreachable' };
     }
 }
 

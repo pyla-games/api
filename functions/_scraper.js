@@ -226,7 +226,6 @@ export async function getFinalDownloadUrl(gameId) {
         const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
         const canvasId = String(Math.floor(Math.random() * 900000000) + 100000000);
-        const randomIP = `${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`;
 
         const body = new URLSearchParams({
             id: gameId,
@@ -244,7 +243,11 @@ export async function getFinalDownloadUrl(gameId) {
                 'Referer': `${BASE_URL}/download/${gameId}`,
                 'Origin': BASE_URL,
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-Forwarded-For': randomIP
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+                'Priority': 'u=1, i'
             },
             body: body.toString(),
         });
@@ -269,7 +272,10 @@ export async function getFinalDownloadUrl(gameId) {
 
             return { status: 'error', message: json.msg || json.message || 'No URL found in target response' };
         } catch (e) {
-            return { status: 'error', message: 'Target returned invalid data format' };
+            return {
+                status: 'error',
+                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150)
+            };
         }
 
     } catch (err) {

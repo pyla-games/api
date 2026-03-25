@@ -215,15 +215,16 @@ export async function getGameDetails(gameId) {
 }
 
 export async function getFinalDownloadUrl(gameId) {
-    let debugInfo = { attempts: [] };
     try {
         const timestamp = String(Math.floor(Date.now() / 1000));
         const hashInput = timestamp + gameId + SECRET_KEY;
+
         const encoder = new TextEncoder();
         const data = encoder.encode(hashInput);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
         const canvasId = String(Math.floor(Math.random() * 900000000) + 100000000);
 
         const body = new URLSearchParams({
@@ -233,47 +234,63 @@ export async function getFinalDownloadUrl(gameId) {
             canvasId: canvasId,
         });
 
-        const fetchOptions = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'Referer': `${BASE_URL}/download/${gameId}`,
-                'Origin': BASE_URL,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: body.toString(),
+        const refererUrl = `${BASE_URL}/download/${gameId}`;
+        let cookieHeader = '';
+
+        try {
+            const primeRes = await fetch(refererUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                redirect: 'follow',
+            });
+
+            const rawCookies = primeRes.headers.get('set-cookie');
+            if (rawCookies) {
+                cookieHeader = rawCookies
+                    .split(',')
+                    .map(c => c.split(';')[0].trim())
+                    .join('; ');
+            }
+        } catch (_) {
+        }
+
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': refererUrl,
+            'Origin': BASE_URL,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Priority': 'u=1, i',
+            'Connection': 'keep-alive',
+            ...(cookieHeader && { 'Cookie': cookieHeader }),
         };
 
-        const targetUrl = `${BASE_URL}/api/getGamesDownloadUrl`;
-
-        let res = await fetch(targetUrl, fetchOptions);
-        let text = await res.text();
-
-        debugInfo.attempts.push({
-            type: 'direct',
-            status: res.status,
-            ok: res.ok,
-            sample: text.substring(0, 200)
+        const res = await fetch(`${BASE_URL}/api/getGamesDownloadUrl`, {
+            method: 'POST',
+            headers,
+            body: body.toString(),
         });
 
-        if (text.trim().startsWith('<') || res.status === 403 || res.status === 401) {
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl + '?' + body.toString())}`;
-            res = await fetch(proxyUrl);
-            const proxyData = await res.json();
-            text = proxyData.contents;
-            debugInfo.attempts.push({
-                type: 'proxy_fallback',
-                status: res.status,
-                sample: text ? text.substring(0, 200) : 'EMPTY'
-            });
-        }
+        if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
+        if (!res.ok) return { status: 'error', message: `Target returned HTTP ${res.status}` };
 
-        if (!text || text.trim() === "") {
-            return { status: 'error', message: 'Empty response', debug: debugInfo };
-        }
-
+        const text = await res.text();
         const cleanText = text.trim().replace(/^"|"$/g, '');
 
         if (cleanText.startsWith('http')) {
@@ -282,29 +299,22 @@ export async function getFinalDownloadUrl(gameId) {
 
         try {
             const json = JSON.parse(text);
-            const url = json.url || json.download_url || (json.data && (json.data.url || json.data.download_url)) || (typeof json.data === 'string' ? json.data : null);
+            const url = json.url || json.download_url || (json.data && json.data.url) || (typeof json.data === 'string' ? json.data : null);
 
             if (url && typeof url === 'string' && url.startsWith('http')) {
                 return { status: 'success', url };
             }
 
-            return {
-                status: 'error',
-                message: 'No URL found in JSON keys',
-                received_json: json,
-                debug: debugInfo
-            };
+            return { status: 'error', message: json.msg || json.message || 'No URL found in target response' };
         } catch (e) {
             return {
                 status: 'error',
-                message: 'Parsing failed or blocked',
-                raw_text: text.substring(0, 500),
-                debug: debugInfo
+                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150)
             };
         }
 
     } catch (err) {
-        return { status: 'error', message: err.message, debug: debugInfo };
+        return { status: 'error', message: err.message || 'Download service unavailable' };
     }
 }
 

@@ -215,16 +215,15 @@ export async function getGameDetails(gameId) {
 }
 
 export async function getFinalDownloadUrl(gameId) {
+    let debugInfo = { attempts: [] };
     try {
         const timestamp = String(Math.floor(Date.now() / 1000));
         const hashInput = timestamp + gameId + SECRET_KEY;
-
         const encoder = new TextEncoder();
         const data = encoder.encode(hashInput);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
         const canvasId = String(Math.floor(Math.random() * 900000000) + 100000000);
 
         const body = new URLSearchParams({
@@ -243,7 +242,6 @@ export async function getFinalDownloadUrl(gameId) {
                 'Referer': `${BASE_URL}/download/${gameId}`,
                 'Origin': BASE_URL,
                 'X-Requested-With': 'XMLHttpRequest',
-                'Accept-Language': 'en-US,en;q=0.9',
             },
             body: body.toString(),
         };
@@ -253,14 +251,28 @@ export async function getFinalDownloadUrl(gameId) {
         let res = await fetch(targetUrl, fetchOptions);
         let text = await res.text();
 
-        if (text.trim().startsWith('<') || res.status === 403) {
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-            res = await fetch(proxyUrl, fetchOptions);
-            text = await res.text();
+        debugInfo.attempts.push({
+            type: 'direct',
+            status: res.status,
+            ok: res.ok,
+            sample: text.substring(0, 200)
+        });
+
+        if (text.trim().startsWith('<') || res.status === 403 || res.status === 401) {
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl + '?' + body.toString())}`;
+            res = await fetch(proxyUrl);
+            const proxyData = await res.json();
+            text = proxyData.contents;
+            debugInfo.attempts.push({
+                type: 'proxy_fallback',
+                status: res.status,
+                sample: text ? text.substring(0, 200) : 'EMPTY'
+            });
         }
 
-        if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
-        if (!res.ok && !text) return { status: 'error', message: `Target returned HTTP ${res.status}` };
+        if (!text || text.trim() === "") {
+            return { status: 'error', message: 'Empty response', debug: debugInfo };
+        }
 
         const cleanText = text.trim().replace(/^"|"$/g, '');
 
@@ -270,22 +282,29 @@ export async function getFinalDownloadUrl(gameId) {
 
         try {
             const json = JSON.parse(text);
-            const url = json.url || json.download_url || (json.data && json.data.url) || (typeof json.data === 'string' ? json.data : null);
+            const url = json.url || json.download_url || (json.data && (json.data.url || json.data.download_url)) || (typeof json.data === 'string' ? json.data : null);
 
             if (url && typeof url === 'string' && url.startsWith('http')) {
                 return { status: 'success', url };
             }
 
-            return { status: 'error', message: json.msg || json.message || 'No URL found in target response' };
+            return {
+                status: 'error',
+                message: 'No URL found in JSON keys',
+                received_json: json,
+                debug: debugInfo
+            };
         } catch (e) {
             return {
                 status: 'error',
-                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150)
+                message: 'Parsing failed or blocked',
+                raw_text: text.substring(0, 500),
+                debug: debugInfo
             };
         }
 
     } catch (err) {
-        return { status: 'error', message: err.message || 'Download service unavailable' };
+        return { status: 'error', message: err.message, debug: debugInfo };
     }
 }
 

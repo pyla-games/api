@@ -234,7 +234,7 @@ export async function getFinalDownloadUrl(gameId) {
             canvasId: canvasId,
         });
 
-        const res = await fetch(`${BASE_URL}/api/getGamesDownloadUrl`, {
+        const fetchOptions = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -244,18 +244,24 @@ export async function getFinalDownloadUrl(gameId) {
                 'Origin': BASE_URL,
                 'X-Requested-With': 'XMLHttpRequest',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'Priority': 'u=1, i'
             },
             body: body.toString(),
-        });
+        };
+
+        const targetUrl = `${BASE_URL}/api/getGamesDownloadUrl`;
+
+        let res = await fetch(targetUrl, fetchOptions);
+        let text = await res.text();
+
+        if (text.trim().startsWith('<') || res.status === 403) {
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            res = await fetch(proxyUrl, fetchOptions);
+            text = await res.text();
+        }
 
         if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
-        if (!res.ok) return { status: 'error', message: `Target returned HTTP ${res.status}` };
+        if (!res.ok && !text) return { status: 'error', message: `Target returned HTTP ${res.status}` };
 
-        const text = await res.text();
         const cleanText = text.trim().replace(/^"|"$/g, '');
 
         if (cleanText.startsWith('http')) {

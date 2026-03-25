@@ -225,40 +225,55 @@ export async function getFinalDownloadUrl(gameId) {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
+        const canvasId = String(Math.floor(Math.random() * 900000000) + 100000000);
+        const randomIP = `${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 254) + 1}`;
+
         const body = new URLSearchParams({
             id: gameId,
             timestamp,
             secretKey: sign,
-            canvasId: '0',
+            canvasId: canvasId,
         });
 
         const res = await fetch(`${BASE_URL}/api/getGamesDownloadUrl`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json, text/plain, */*',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'Referer': `${BASE_URL}/download/${gameId}`,
+                'Origin': BASE_URL,
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-Forwarded-For': randomIP
             },
             body: body.toString(),
         });
 
         if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
-        if (!res.ok) return { status: 'error', message: `HTTP ${res.status}` };
+        if (!res.ok) return { status: 'error', message: `Target returned HTTP ${res.status}` };
 
         const text = await res.text();
-        try {
-            const json = JSON.parse(text);
-            if (typeof json === 'string' && json.startsWith('http')) return { status: 'success', url: json };
-            if (json.url) return { status: 'success', url: json.url };
-            if (json.data?.url) return { status: 'success', url: json.data.url };
-        } catch {
-            if (text && text.trim().startsWith('http')) return { status: 'success', url: text.trim() };
+        const cleanText = text.trim().replace(/^"|"$/g, '');
+
+        if (cleanText.startsWith('http')) {
+            return { status: 'success', url: cleanText };
         }
 
-        return { status: 'error', message: 'No download URL found' };
-    } catch {
-        return { status: 'error', message: 'Download service unavailable' };
+        try {
+            const json = JSON.parse(text);
+            const url = json.url || json.download_url || (json.data && json.data.url) || (typeof json.data === 'string' ? json.data : null);
+
+            if (url && typeof url === 'string' && url.startsWith('http')) {
+                return { status: 'success', url };
+            }
+
+            return { status: 'error', message: json.msg || json.message || 'No URL found in target response' };
+        } catch (e) {
+            return { status: 'error', message: 'Target returned invalid data format' };
+        }
+
+    } catch (err) {
+        return { status: 'error', message: err.message || 'Download service unavailable' };
     }
 }
 

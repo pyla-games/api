@@ -234,80 +234,53 @@ export async function getFinalDownloadUrl(gameId) {
             canvasId: canvasId,
         });
 
+        const targetUrl = `${BASE_URL}/api/getGamesDownloadUrl`;
         const refererUrl = `${BASE_URL}/download/${gameId}`;
-        let cookieHeader = '';
 
-        try {
-            const primeRes = await fetch(refererUrl, {
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                },
-                redirect: 'follow',
-            });
+        const proxies = [
+            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+            `https://thingproxy.freeboard.io/fetch/${targetUrl}`,
+        ];
 
-            console.log('[preflight] status:', primeRes.status);
-            console.log('[preflight] headers:', Object.fromEntries(primeRes.headers.entries()));
+        let res = null;
+        let lastError = '';
 
-            const rawCookies = primeRes.headers.get('set-cookie');
-            console.log('[preflight] raw set-cookie:', rawCookies);
+        for (const proxyUrl of proxies) {
+            try {
+                res = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Referer': refererUrl,
+                        'Origin': BASE_URL,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+                        'Sec-Ch-Ua-Mobile': '?0',
+                        'Sec-Ch-Ua-Platform': '"Windows"',
+                        'Sec-Fetch-Dest': 'empty',
+                        'Sec-Fetch-Mode': 'cors',
+                        'Sec-Fetch-Site': 'same-origin',
+                    },
+                    body: body.toString(),
+                });
 
-            if (rawCookies) {
-                cookieHeader = rawCookies
-                    .split(',')
-                    .map(c => c.split(';')[0].trim())
-                    .join('; ');
+                if (res.ok) break;
+                lastError = `proxy ${proxyUrl} returned ${res.status}`;
+            } catch (e) {
+                lastError = `proxy ${proxyUrl} threw: ${e.message}`;
+                res = null;
             }
-
-            console.log('[preflight] cookieHeader built:', cookieHeader || 'NONE');
-        } catch (primeErr) {
-            console.log('[preflight] failed:', primeErr.message);
         }
 
-        const headers = {
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Referer': refererUrl,
-            'Origin': BASE_URL,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"Windows"',
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
-            'Priority': 'u=1, i',
-            'Connection': 'keep-alive',
-            ...(cookieHeader && { 'Cookie': cookieHeader }),
-        };
-
-        console.log('[post] sending to:', `${BASE_URL}/api/getGamesDownloadUrl`);
-        console.log('[post] headers:', JSON.stringify(headers, null, 2));
-        console.log('[post] body:', body.toString());
-
-        const res = await fetch(`${BASE_URL}/api/getGamesDownloadUrl`, {
-            method: 'POST',
-            headers,
-            body: body.toString(),
-        });
-
-        console.log('[post] response status:', res.status, res.statusText);
-        console.log('[post] response headers:', Object.fromEntries(res.headers.entries()));
-
-        if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
-        if (!res.ok) return { status: 'error', message: `Target returned HTTP ${res.status}` };
+        if (!res || !res.ok) {
+            return { status: 'error', message: `All proxies failed. Last: ${lastError}` };
+        }
 
         const text = await res.text();
-        console.log('[post] raw body (first 1000):', text.substring(0, 1000));
-
         const cleanText = text.trim().replace(/^"|"$/g, '');
 
         if (cleanText.startsWith('http')) {
@@ -322,25 +295,19 @@ export async function getFinalDownloadUrl(gameId) {
                 return { status: 'success', url };
             }
 
-            return { status: 'error', message: json.msg || json.message || 'No URL found in target response' };
+            return { status: 'error', message: json.msg || json.message || 'No URL found in response' };
         } catch (e) {
             return {
                 status: 'error',
-                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150),
+                message: 'Firewall block after proxy. Response: ' + cleanText.substring(0, 150),
                 debug: {
-                    postStatus: res.status,
-                    postStatusText: res.statusText,
-                    postResponseHeaders: Object.fromEntries(res.headers.entries()),
-                    cookiesSent: cookieHeader || 'none',
+                    status: res.status,
                     fullBody: cleanText.substring(0, 2000),
-                    isCloudflare: res.headers.get('server')?.toLowerCase().includes('cloudflare') ?? false,
-                    cfMitigated: res.headers.get('cf-mitigated') || 'none',
                 }
             };
         }
 
     } catch (err) {
-        console.log('[getFinalDownloadUrl] outer catch:', err.message);
         return { status: 'error', message: err.message || 'Download service unavailable' };
     }
 }

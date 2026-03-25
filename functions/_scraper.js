@@ -251,14 +251,22 @@ export async function getFinalDownloadUrl(gameId) {
                 redirect: 'follow',
             });
 
+            console.log('[preflight] status:', primeRes.status);
+            console.log('[preflight] headers:', Object.fromEntries(primeRes.headers.entries()));
+
             const rawCookies = primeRes.headers.get('set-cookie');
+            console.log('[preflight] raw set-cookie:', rawCookies);
+
             if (rawCookies) {
                 cookieHeader = rawCookies
                     .split(',')
                     .map(c => c.split(';')[0].trim())
                     .join('; ');
             }
-        } catch (_) {
+
+            console.log('[preflight] cookieHeader built:', cookieHeader || 'NONE');
+        } catch (primeErr) {
+            console.log('[preflight] failed:', primeErr.message);
         }
 
         const headers = {
@@ -281,16 +289,25 @@ export async function getFinalDownloadUrl(gameId) {
             ...(cookieHeader && { 'Cookie': cookieHeader }),
         };
 
+        console.log('[post] sending to:', `${BASE_URL}/api/getGamesDownloadUrl`);
+        console.log('[post] headers:', JSON.stringify(headers, null, 2));
+        console.log('[post] body:', body.toString());
+
         const res = await fetch(`${BASE_URL}/api/getGamesDownloadUrl`, {
             method: 'POST',
             headers,
             body: body.toString(),
         });
 
+        console.log('[post] response status:', res.status, res.statusText);
+        console.log('[post] response headers:', Object.fromEntries(res.headers.entries()));
+
         if (res.status === 429) return { status: 'rate_limited', message: 'Too many requests' };
         if (!res.ok) return { status: 'error', message: `Target returned HTTP ${res.status}` };
 
         const text = await res.text();
+        console.log('[post] raw body (first 1000):', text.substring(0, 1000));
+
         const cleanText = text.trim().replace(/^"|"$/g, '');
 
         if (cleanText.startsWith('http')) {
@@ -309,11 +326,21 @@ export async function getFinalDownloadUrl(gameId) {
         } catch (e) {
             return {
                 status: 'error',
-                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150)
+                message: 'Blocked by target firewall. Target response: ' + cleanText.substring(0, 150),
+                debug: {
+                    postStatus: res.status,
+                    postStatusText: res.statusText,
+                    postResponseHeaders: Object.fromEntries(res.headers.entries()),
+                    cookiesSent: cookieHeader || 'none',
+                    fullBody: cleanText.substring(0, 2000),
+                    isCloudflare: res.headers.get('server')?.toLowerCase().includes('cloudflare') ?? false,
+                    cfMitigated: res.headers.get('cf-mitigated') || 'none',
+                }
             };
         }
 
     } catch (err) {
+        console.log('[getFinalDownloadUrl] outer catch:', err.message);
         return { status: 'error', message: err.message || 'Download service unavailable' };
     }
 }

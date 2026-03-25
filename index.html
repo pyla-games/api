@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vyla Games API</title>
+    <link rel="icon" href="/static/images/favicon.ico">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --border: #1e1e2e;
+            --accent: #7c6af7;
+            --accent2: #f76a8c;
+            --text: #e2e2f0;
+            --muted: #6b6b8a;
+            --font-head: 'Syne', sans-serif;
+            --font-body: 'DM Mono', monospace;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@300;400&display=swap');
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 720px;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: var(--font-head);
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .tagline {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 3rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .endpoints {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .endpoint {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+            color: var(--text);
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .endpoint:hover {
+            border-color: var(--accent);
+            background: #1a1a28;
+        }
+
+        .method {
+            font-size: 0.7rem;
+            font-weight: 400;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 2px 6px;
+            letter-spacing: 0.1em;
+            flex-shrink: 0;
+        }
+
+        .path {
+            font-size: 0.875rem;
+            color: var(--text);
+        }
+
+        .desc {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-left: auto;
+        }
+
+        .section-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 2rem 0 0.75rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Vyla Games</h1>
+        <p class="tagline">REST API &mdash; v2.0</p>
+        <p class="section-label">Endpoints</p>
+        <div class="endpoints">
+            <a class="endpoint" href="/api/health"><span class="method">GET</span><span
+                    class="path">/api/health</span><span class="desc">Health check</span></a>
+            <a class="endpoint" href="/api/genres"><span class="method">GET</span><span
+                    class="path">/api/genres</span><span class="desc">All genres</span></a>
+            <a class="endpoint" href="/api/games?genre=1&page=1"><span class="method">GET</span><span
+                    class="path">/api/games?genre={id}&page={n}</span><span class="desc">Game list</span></a>
+            <a class="endpoint" href="/api/search?q=minecraft&page=1"><span class="method">GET</span><span
+                    class="path">/api/search?q={query}&page={n}</span><span class="desc">Search games</span></a>
+            <a class="endpoint" href="#"><span class="method">GET</span><span class="path">/api/game/{id}</span><span
+                    class="desc">Game details</span></a>
+            <a class="endpoint" href="#"><span class="method">GET</span><span
+                    class="path">/api/download/{id}</span><span class="desc">Download URL</span></a>
+        </div>
+    </div>
+</body>
+
+</html>

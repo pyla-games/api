@@ -1,6 +1,6 @@
-![Vyla Game Scraper Logo](https://vyla-games.vercel.app/static/images/github-banner.png)
+![Pyla Game Scraper Logo](https://raw.githubusercontent.com/EndOverdosing/Pyla-API/refs/heads/main/static/images/banner.png)
 
-# Vyla Games API
+# Pyla Games API
 
 A modern Flask-based game discovery and download API. Scrapes game data from koyso.com and serves it through a responsive web interface with full JSON API support.
 
@@ -40,37 +40,7 @@ python app_final.py
 
 Server runs at `http://127.0.0.1:5000`
 
-### Deploy to Vercel
-
-1. Install Vercel CLI:
-
-```bash
-npm i -g vercel
-```
-
-2. Create `vercel.json`:
-
-```json
-{
-  "version": 2,
-  "builds": [
-    { "src": "app_final.py", "use": "@vercel/python" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "app_final.py" }
-  ]
-}
-```
-
-3. Deploy:
-
-```bash
-vercel --prod
-```
-
 ## Web Interface
-
-A full frontend is available at [https://pyla.vercel.app](https://pyla.vercel.app):
 
 * Browse games by genre with horizontal scrolling rows
 * Search games by keyword with debounced input
@@ -90,7 +60,7 @@ A full frontend is available at [https://pyla.vercel.app](https://pyla.vercel.ap
 ### Base URL
 
 ```
-Production: https://vyla-games.vercel.app
+Production: https://pyla.pages.dev
 Local: http://127.0.0.1:5000
 ```
 
@@ -261,120 +231,6 @@ GET /{base64_url}
 | 14 | Indie Games         |
 | 15 | LAN connection      |
 
-## Configuration
-
-Key settings in `VylaScraper`:
-
-```python
-self.base_url = "https://koyso.com"
-self.request_delay = 0.05
-self.secret_key = "f6i6@m29r3fwi^yqd"
-```
-
-## Architecture
-
-**Stateless Design:** Base64 URL encoding allows serverless deployment:
-
-```
-Original URL: https://koyso.com/image.jpg
-Encoded: /aHR0cHM6Ly9rb3lzby5jb20vaW1hZ2UuanBn
-```
-
-**Workflow:**
-
-1. Scraping – Fetch HTML from koyso.com
-2. Parsing – Extract game data, images, videos
-3. Encoding – Media URLs base64-encoded
-4. API Response – JSON with encoded proxy URLs
-5. Media Proxy – Decodes and serves content
-
-**Download Authentication:** SHA-256 signed requests to get final download links.
-
-## Frontend Customization
-
-Edit `index.html` to modify:
-
-* Colors and gradients
-* API base URL
-* Grid layout
-* Card styling
-
-## Deployment Options
-
-* Vercel: `vercel --prod`
-* Railway: `railway up`
-* Heroku: `git push heroku main`
-* Docker:
-
-```dockerfile
-FROM python:3.9-slim
-WORKDIR /app
-COPY . .
-RUN pip install flask
-CMD ["python", "app_final.py"]
-```
-
-* Traditional server:
-
-```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app_final:app
-```
-
-## CORS & Security
-
-* Full CORS support
-* JSON content-type headers
-* OPTIONS preflight handling
-* Public API, no authentication required
-
-## Error Handling
-
-All errors return JSON:
-
-```json
-{ "error": "Error description" }
-```
-
-HTTP Status Codes: 200 (Success), 400 (Bad request), 404 (Not found), 500 (Server error)
-
-## Example Usage
-
-### Python
-
-```python
-import requests
-
-response = requests.get('https://vyla-games.vercel.app/api/games?genre=2&page=1')
-games = response.json()['games']
-
-for game in games:
-    print(f"{game['title']} - {game['id']}")
-```
-
-### JavaScript
-
-```javascript
-fetch('https://vyla-games.vercel.app/api/game/1927')
-  .then(res => res.json())
-  .then(game => {
-  });
-```
-
-### cURL
-
-```bash
-curl https://vyla-games.vercel.app/api/search?q=horror&page=1
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Implement changes
-4. Test locally
-5. Submit a pull request
-
 ## Disclaimer
 
 * For educational purposes only
@@ -392,5 +248,5 @@ MIT License – See LICENSE file
 * Built with Flask
 * Deployed on Vercel
 
-**Live Demo:** [https://vyla-games.vercel.app](https://vyla-games.vercel.app)
+**Live Demo:** https://pyla.pages.dev
 **API Status:** Check `/api/health` endpoint

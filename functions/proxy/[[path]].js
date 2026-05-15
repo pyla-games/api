@@ -33,7 +33,7 @@ export async function onRequestGet({ params }) {
         const res = await fetch(originalUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://koyso.com/',
+                'Referer': 'https://playzip.com/',
                 'Accept': 'image/webp,image/*,*/*',
             },
         });

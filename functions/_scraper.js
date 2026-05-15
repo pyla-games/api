@@ -1,5 +1,4 @@
-const BASE_URL = "https://koyso.com";
-const SECRET_KEY = "f6i6@m29r3fwi^yqd";
+const BASE_URL = "https://playzip.com";
 
 const GENRES = {
     '1': ['All Games', '/'],
@@ -193,11 +192,11 @@ export async function getGameDetails(gameId) {
     details.version = versionMatch ? versionMatch[1].trim() : 'Unknown';
 
     const recommendations = [];
-    const recPattern = /<a class="recommendations_item" href="https:\/\/koyso\.com\/game\/(\d+)"[^>]*title="([^"]*)"/g;
+    const recPattern = /<a class="recommendations_item" href="https:\/\/playzip\.com\/game\/(\d+)"[^>]*title="([^"]*)"/g;
     let recMatch;
     while ((recMatch = recPattern.exec(htmlContent)) !== null && recommendations.length < 6) {
         const [, recId, recTitle] = recMatch;
-        const imgPat = new RegExp(`<a class="recommendations_item" href="https://koyso\\.com/game/${recId}".*?<img[^>]*src="([^"]+)"`, 's');
+        const imgPat = new RegExp(`<a class="recommendations_item" href="https://playzip\\.com/game/${recId}".*?<img[^>]*src="([^"]+)"`, 's');
         const imgM = htmlContent.match(imgPat);
         recommendations.push({
             id: recId,

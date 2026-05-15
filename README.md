@@ -2,7 +2,7 @@
 
 # Pyla Games API
 
-A modern Flask-based game discovery and download API. Scrapes game data from koyso.com and serves it through a responsive web interface with full JSON API support.
+A modern Flask-based game discovery and download API. Scrapes game data from playzip.com and serves it through a responsive web interface with full JSON API support.
 
 ## Features
 
@@ -244,7 +244,7 @@ MIT License – See LICENSE file
 
 ## Acknowledgments
 
-* Data sourced from koyso.com
+* Data sourced from playzip.com
 * Built with Flask
 * Deployed on Vercel
 
